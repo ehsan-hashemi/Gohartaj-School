@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>داشبورد دانش‌آموز | Gohartaj School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img src="../../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
+        <span class="brand-name">Gohartaj School</span>
+      </div>
+      <nav class="top-nav">
+        <a href="/" class="nav-link">خانه</a>
+        <a href="/news" class="nav-link">اخبار</a>
+        <a href="/news/live" class="nav-link">خبر زنده</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container app-container">
+    <div class="dash-layout">
+      <aside class="left-nav">
+        <nav class="side-nav">
+          <a href="/dash/student?section=home" class="side-link" id="link-home">خانه</a>
+          <a href="/dash/student?section=profile" class="side-link" id="link-profile">پروفایل</a>
+          <a href="/dash/student?section=schedule" class="side-link" id="link-schedule">برنامه کلاسی</a>
+          <a href="/dash/student?section=reportcards" class="side-link" id="link-reportcards">کارنامه</a>
+        </nav>
+      </aside>
+      <section class="dash-content">
+        <div id="student-view"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>© 2025 Gohartaj School</div>
+    </div>
+  </footer>
+
+  <script src="../../assets/js/data.js"></script>
+  <script src="../../assets/js/common.js"></script>
+  <script>
+    (async () => {
+      const sess = sessionStorage.getItem("session");
+      if (!sess) { location.href = "/login/"; return; }
+      const { role, user } = JSON.parse(sess);
+      if (role !== "student") { location.href = "/login/"; return; }
+
+      const url = new URL(location.href);
+      const section = url.searchParams.get("section") || "home";
+      document.querySelectorAll(".side-link").forEach(a => a.classList.remove("active"));
+      document.getElementById("link-" + section)?.classList.add("active");
+
+      const view = document.getElementById("student-view");
+
+      if (section === "home") {
+        const reportcards = await Data.getReportcards();
+        const myReports = reportcards.filter(r => r.student_national_id === user.national_id);
+        view.innerHTML = `
+          <section class="card">
+            <h3>خانه</h3>
+            <div class="grid-2">
+              <div class="student-status">
+                ${imageOrNone(user.profile_image, DefaultIcons.profile, "avatar xl")}
+                <div>
+                  <div><span class="label">نام:</span> ${user.full_name}</div>
+                  <div><span class="label">کلاس:</span> ${user.class_name || "-"}</div>
+                  <div><span class="label">پایه:</span> ${user.grade_level || "-"}</div>
+                  <div><span class="label">زمان:</span> <span id="student-clock" class="clock"></span></div>
+                  <div><span class="label">کارنامه:</span> ${myReports.length ? myReports.map(r => `ترم ${r.term}`).join("، ") : "ناموجود"}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        `;
+        liveClock("student-clock");
+      }
+
+      if (section === "profile") {
+        view.innerHTML = `
+          <section class="card">
+            <h3>پروفایل</h3>
+            <div class="profile-view">
+              ${imageOrNone(user.profile_image, DefaultIcons.profile, "avatar xl")}
+              <div class="profile-grid">
+                <div><span class="label">نام و نام خانوادگی:</span> ${user.full_name}</div>
+                <div><span class="label">کد ملی:</span> ${user.national_id}</div>
+                <div><span class="label">نقش:</span> دانش‌آموز</div>
+                <div><span class="label">پایه:</span> ${user.grade_level || "-"}</div>
+                <div><span class="label">کلاس:</span> ${user.class_name || "-"}</div>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      if (section === "schedule") {
+        const schedules = await Data.getSchedules();
+        const scheduleData = user.class_name && schedules[user.class_name] ? schedules[user.class_name] : null;
+        view.innerHTML = `
+          <section class="card">
+            <h3>برنامه کلاسی</h3>
+            ${scheduleData ? `
+              <div class="schedule-grid">
+                ${Object.entries(scheduleData).map(([day, lessons]) => `
+                  <div class="schedule-day">
+                    <div class="day-name">${day}</div>
+                    <ul class="lesson-list">
+                      ${lessons.map(l => `<li class="lesson-item">${l}</li>`).join("")}
+                    </ul>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<p class="note">برای کلاس شما برنامه‌ای ثبت نشده است.</p>`}
+          </section>
+        `;
+      }
+
+      if (section === "reportcards") {
+        const reportcards = await Data.getReportcards();
+        const myReports = reportcards.filter(r => r.student_national_id === user.national_id);
+        view.innerHTML = `
+          <section class="card">
+            <h3>کارنامه</h3>
+            ${myReports.length ? `
+              <ul class="report-list">
+                ${myReports.map(r => `
+                  <li class="report-item">
+                    <span>ترم ${r.term}</span>
+                    <a class="btn btn-secondary" href="${r.file_url}" target="_blank" rel="noopener">مشاهده</a>
+                  </li>
+                `).join("")}
+              </ul>
+            ` : `<p class="note">کارنامه‌ای موجود نیست.</p>`}
+          </section>
+        `;
+      }
+    })();
+  </script>
+</body>
+</html>

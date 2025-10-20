@@ -1,21 +1,27 @@
-// data.js - بارگذاری و کش ساده داده‌ها از فایل‌های JSON محلی یا GitHub Pages
-
-const Data = (() => {
+// data.js - مسیرهای امن برای صفحات مختلف (ریشه و زیرپوشه‌ها)
+(function (global) {
   const cache = {};
 
-  // تشخیص Base URL
-  // اگر روی GitHub Pages هستی (مثلاً username.github.io/repo-name/)،
-  // repoName رو اینجا وارد کن:
-  const REPO_NAME = "gohartaj-school"; // 👈 اسم ریپوی خودت رو جایگزین کن
-  let BASE_URL = "https://gohartaj.ehsanpg.ir/";
-
-  if (location.hostname.includes("github.io")) {
-    // روی GitHub Pages
-    BASE_URL = `/${REPO_NAME}`;
+  // BASE برای هر صفحه: اگر در ریشه هستیم ""، اگر در زیرپوشه‌ای هستیم "../" یا "../../"
+  function getBase() {
+    const path = location.pathname;
+    // نمونه‌ها:
+    // "/": base ""
+    // "/news": base "../" برای دسترسی به /data از /news/
+    // "/news/live/": base "../../"
+    // "/login/": base "../"
+    // "/dash/admin/": base "../../"
+    // "/dash/student": base "../../"
+    // قاعده: تعداد سطح‌های پوشه را بشماریم و "../" به همان تعداد اضافه کنیم تا به ریشه برسیم.
+    const parts = path.split("/").filter(Boolean);
+    const depth = parts.length; // "news" → 1، "news/live" → 2، "dash/admin" → 2
+    return depth === 0 ? "" : "../".repeat(depth);
   }
 
-  async function loadJSON(path) {
-    const fullPath = `${BASE_URL}/${path}`;
+  const BASE = getBase();
+
+  async function loadJSON(relPath) {
+    const fullPath = BASE + "data/" + relPath;
     if (cache[fullPath]) return cache[fullPath];
     const res = await fetch(fullPath, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to load " + fullPath);
@@ -24,22 +30,14 @@ const Data = (() => {
     return json;
   }
 
-  // منابع داده
-  const sources = {
-    announcements: "data/announcements.json",
-    news: "data/news.json",
-    live: "data/live.json",
-    students: "data/students.json",
-    schedules: "data/schedules.json",
-    reportcards: "data/reportcards.json"
+  const Data = {
+    getAnnouncements: () => loadJSON("announcements.json"),
+    getNews: () => loadJSON("news.json"),
+    getLive: () => loadJSON("live.json"),
+    getStudents: () => loadJSON("students.json"),
+    getSchedules: () => loadJSON("schedules.json"),
+    getReportcards: () => loadJSON("reportcards.json")
   };
 
-  return {
-    getAnnouncements: () => loadJSON(sources.announcements),
-    getNews: () => loadJSON(sources.news),
-    getLive: () => loadJSON(sources.live),
-    getStudents: () => loadJSON(sources.students),
-    getSchedules: () => loadJSON(sources.schedules),
-    getReportcards: () => loadJSON(sources.reportcards)
-  };
-})();
+  global.Data = Data;
+})(window);

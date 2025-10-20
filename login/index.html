@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>ورود | Gohartaj School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img src="../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
+        <span class="brand-name">Gohartaj School</span>
+      </div>
+      <nav class="top-nav">
+        <a href="/" class="nav-link">خانه</a>
+        <a href="/news" class="nav-link">اخبار</a>
+        <a href="/news/live" class="nav-link">خبر زنده</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container app-container">
+    <section class="login-section">
+      <form id="login-form" class="card form-card">
+        <h3>ورود به داشبورد</h3>
+        <label>نام و نام خانوادگی
+          <input type="text" name="full_name" required placeholder="مثلاً علی رضایی">
+        </label>
+        <label>کد ملی
+          <input type="text" name="national_id" required placeholder="مثلاً 1111111111">
+        </label>
+        <label>رمز عبور
+          <input type="password" name="password" required placeholder="رمز عبور">
+        </label>
+        <div class="form-actions">
+          <button type="submit" class="btn">ورود</button>
+        </div>
+        <p id="login-error" class="error"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>© 2025 Gohartaj School</div>
+    </div>
+  </footer>
+
+  <script src="../assets/js/data.js"></script>
+  <script src="../assets/js/common.js"></script>
+  <script>
+    (function () {
+      const form = document.getElementById("login-form");
+      const err = document.getElementById("login-error");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        err.textContent = "";
+        const full_name = form.full_name.value.trim();
+        const national_id = form.national_id.value.trim();
+        const password = form.password.value;
+        try {
+          const dataset = await Data.getStudents();
+          const admin = (dataset.admins || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
+          if (admin) { sessionStorage.setItem("session", JSON.stringify({ role: "admin", user: admin })); location.href = "/dash/admin/"; return; }
+          const student = (dataset.students || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
+          if (student) { sessionStorage.setItem("session", JSON.stringify({ role: "student", user: student })); location.href = "/dash/student"; return; }
+          err.textContent = "ورود ناموفق. اطلاعات را بررسی کنید.";
+        } catch {
+          err.textContent = "بارگذاری داده‌ها با خطا مواجه شد.";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

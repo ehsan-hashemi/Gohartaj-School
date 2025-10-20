@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>خبر زنده | Gohartaj School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img src="../../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
+        <span class="brand-name">Gohartaj School</span>
+      </div>
+      <nav class="top-nav">
+        <a href="/" class="nav-link">خانه</a>
+        <a href="/news" class="nav-link">اخبار</a>
+        <a href="/news/live" class="nav-link active">خبر زنده</a>
+        <a href="/login/" class="nav-btn">ورود</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container app-container">
+    <section class="card">
+      <h3>پخش زنده</h3>
+      <div id="live-wrap" class="live-wrapper"></div>
+      <div id="live-meta" class="live-meta"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>© 2025 Gohartaj School</div>
+      <div><a href="/login/" class="footer-login-btn">ورود به داشبورد</a></div>
+    </div>
+  </footer>
+
+  <script src="../../assets/js/data.js"></script>
+  <script src="../../assets/js/common.js"></script>
+  <script>
+    (async () => {
+      const live = await Data.getLive();
+      document.getElementById("live-wrap").innerHTML = live.live_embed_code || "<p class='note'>پخش زنده در دسترس نیست.</p>";
+      document.getElementById("live-meta").innerHTML = `
+        <h4>${live.title || ""}</h4>
+        <p>${live.body || ""}</p>
+        <small>${formatDateFA(live.published_at || "")}</small>
+      `;
+    })();
+  </script>
+</body>
+</html>

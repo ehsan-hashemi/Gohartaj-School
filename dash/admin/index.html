@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>داشبورد مدیر | Gohartaj School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img src="../../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
+        <span class="brand-name">Gohartaj School</span>
+      </div>
+      <nav class="top-nav">
+        <a href="/" class="nav-link">خانه</a>
+        <a href="/news" class="nav-link">اخبار</a>
+        <a href="/news/live" class="nav-link">خبر زنده</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container app-container">
+    <div class="dash-layout">
+      <aside class="left-nav">
+        <nav class="side-nav">
+          <a href="/dash/admin/?section=home" class="side-link" id="link-home">خانه</a>
+          <a href="/dash/admin/?section=students" class="side-link" id="link-students">دانش‌آموزان</a>
+          <a href="/dash/admin/?section=schedules" class="side-link" id="link-schedules">برنامه کلاس</a>
+        </nav>
+      </aside>
+      <section class="dash-content">
+        <div id="admin-view"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>© 2025 Gohartaj School</div>
+    </div>
+  </footer>
+
+  <script src="../../assets/js/data.js"></script>
+  <script src="../../assets/js/common.js"></script>
+  <script>
+    (async () => {
+      // نشست
+      const sess = sessionStorage.getItem("session");
+      if (!sess) { location.href = "/login/"; return; }
+      const { role, user } = JSON.parse(sess);
+      if (role !== "admin") { location.href = "/login/"; return; }
+
+      // ناوبری بخش‌ها
+      const url = new URL(location.href);
+      const section = url.searchParams.get("section") || "home";
+      document.querySelectorAll(".side-link").forEach(a => a.classList.remove("active"));
+      document.getElementById("link-" + section)?.classList.add("active");
+
+      const view = document.getElementById("admin-view");
+
+      if (section === "home") {
+        view.innerHTML = `
+          <section class="card">
+            <h3>خانه</h3>
+            <div class="grid-2">
+              <div>
+                <p>به پنل مدیریت خوش آمدید.</p>
+                <p>از طریق منوی سمت چپ، دانش‌آموزان یا برنامه‌های کلاس را مشاهده کنید.</p>
+              </div>
+              <div class="clock-box">
+                <div class="label">زمان جاری:</div>
+                <div id="admin-clock" class="clock"></div>
+              </div>
+            </div>
+          </section>
+        `;
+        liveClock("admin-clock");
+      }
+
+      if (section === "students") {
+        const data = await Data.getStudents();
+        const students = data.students || [];
+        view.innerHTML = `
+          <section class="card">
+            <h3>دانش‌آموزان</h3>
+            <div class="filters">
+              <input type="text" id="q" placeholder="نام یا کد ملی">
+              <input type="text" id="class_q" placeholder="مثلاً هفتم ۲">
+              <button class="btn" id="search_btn">جست‌وجو</button>
+            </div>
+            <div id="results" class="student-list"></div>
+          </section>
+        `;
+        const results = document.getElementById("results");
+        const q = document.getElementById("q");
+        const cq = document.getElementById("class_q");
+        document.getElementById("search_btn").addEventListener("click", () => {
+          const qv = q.value.trim();
+          const cv = cq.value.trim();
+          const filtered = students.filter(s => {
+            const matchQ = qv ? (s.full_name.includes(qv) || s.national_id.includes(qv)) : true;
+            const matchC = cv ? (s.class_name === cv) : true;
+            return matchQ && matchC;
+          });
+          renderList(filtered);
+        });
+        function renderList(items) {
+          results.innerHTML = items.map(s => `
+            <div class="student-item">
+              ${imageOrNone(s.profile_image, DefaultIcons.profile, "avatar")}
+              <div class="student-meta">
+                <div class="strong">${s.full_name}</div>
+                <div>کد ملی: ${s.national_id}</div>
+                <div>کلاس: ${s.class_name || "-"}</div>
+                <div>پایه: ${s.grade_level || "-"}</div>
+              </div>
+            </div>
+          `).join("") || "<p class='note'>نتیجه‌ای یافت نشد.</p>";
+        }
+        renderList(students);
+      }
+
+      if (section === "schedules") {
+        const schedules = await Data.getSchedules();
+        const classes = Object.keys(schedules);
+        view.innerHTML = `
+          <section class="card">
+            <h3>برنامه کلاس</h3>
+            <div class="filters">
+              <select id="class_select">
+                ${classes.map(c => `<option value="${c}">${c}</option>`).join("")}
+              </select>
+              <button class="btn" id="show_schedule_btn">نمایش برنامه</button>
+            </div>
+            <div id="schedule_container"></div>
+          </section>
+        `;
+        const select = document.getElementById("class_select");
+        const btn = document.getElementById("show_schedule_btn");
+        const container = document.getElementById("schedule_container");
+        function renderSchedule(cls) {
+          const data = schedules[cls];
+          if (!data) { container.innerHTML = "<p class='note'>برنامه‌ای یافت نشد.</p>"; return; }
+          container.innerHTML = `
+            <div class="schedule-grid">
+              ${Object.entries(data).map(([day, lessons]) => `
+                <div class="schedule-day">
+                  <div class="day-name">${day}</div>
+                  <ul class="lesson-list">
+                    ${lessons.map(l => `<li class="lesson-item">${l}</li>`).join("")}
+                  </ul>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }
+        btn.addEventListener("click", () => renderSchedule(select.value));
+        renderSchedule(select.value);
+      }
+    })();
+  </script>
+</body>
+</html>
