@@ -1,22 +1,17 @@
-// app.js - روتینگ کلاینتی، مدیریت لاگین و نقش‌ها، هدایت صفحات
+// app.js - روتینگ کلاینتی با مسیرهای دقیق، نشست محلی، و کنترل بخش‌های اختصاصی
 
 const Router = (() => {
-  // مسیرهای مورد نیاز
   const routes = {
     "/": "home",
     "/news": "news",
     "/news/live": "live",
-    "/login": "login",
-    "/dash/admin": "dash_admin",
-    "/dash/student": "dash_student"
+    "/login/": "login",
+    "/dash/admin/": "dash_admin",
+    "/dash/student": "dash_student" // بدون اسلش پایانی به‌صورت هم‌خانواده پذیرفته می‌شود
   };
 
-  // ذخیره‌ی ساده نشست (توکن و نقش) در localStorage
   const Session = {
-    get: () => {
-      try { return JSON.parse(localStorage.getItem("session")) || null; }
-      catch { return null; }
-    },
+    get: () => { try { return JSON.parse(localStorage.getItem("session")) || null; } catch { return null; } },
     set: (s) => localStorage.setItem("session", JSON.stringify(s)),
     clear: () => localStorage.removeItem("session")
   };
@@ -29,84 +24,74 @@ const Router = (() => {
   function linkHandler(e) {
     const a = e.target.closest("a[data-link]");
     if (!a) return;
-    const href = a.getAttribute("href");
-    // GitHub Pages-friendly: از History API استفاده می‌کنیم
     e.preventDefault();
+    const href = a.getAttribute("href");
     push(href);
+  }
+
+  function normalizePath(p) {
+    let np = p.trim();
+    // حذف اسلش‌های اضافه انتها برای هماهنگی
+    if (np.length > 1) np = np.replace(/\/+$/, "/");
+    if (np === "") np = "/";
+    // تصحیح غلط‌های رایج:
+    if (np === "/dash/admin") np = "/dash/admin/";
+    if (np === "/login") np = "/login/";
+    return np;
+  }
+
+  function getQuerySection(defaultSection = "home") {
+    const url = new URL(location.href);
+    const section = url.searchParams.get("section");
+    return section || defaultSection;
   }
 
   async function render() {
     const app = document.getElementById("app");
-    const path = location.pathname;
-
-    // هدایت اشتباهات تایپی رایج (مثلاً dashbord → dashboard)
-    const normalized = normalizePath(path);
-    if (normalized !== path) {
-      history.replaceState({}, "", normalized);
-    }
-
-    const routeName = routes[normalized] || "home";
+    const path = normalizePath(location.pathname);
+    if (path !== location.pathname) history.replaceState({}, "", path);
+    const routeName = routes[path] || "home";
     const session = Session.get();
 
     try {
       switch (routeName) {
-        case "home": {
+        case "home":
           app.innerHTML = await UI.homePage();
           break;
-        }
-        case "news": {
+        case "news":
           app.innerHTML = await UI.newsPage();
           break;
-        }
-        case "live": {
+        case "live":
           app.innerHTML = await UI.livePage();
           break;
-        }
-        case "login": {
+        case "login":
           app.innerHTML = UI.loginPage();
           attachLoginForm();
           break;
-        }
         case "dash_admin": {
-          if (!session || session.role !== "admin") {
-            push("/login");
-            return;
-          }
-          app.innerHTML = await UI.adminDash(session.user);
+          if (!session || session.role !== "admin") { push("/login/"); return; }
+          const section = getQuerySection("home");
+          app.innerHTML = await UI.adminDash(session.user, section);
           break;
         }
         case "dash_student": {
-          if (!session || session.role !== "student") {
-            push("/login");
-            return;
-          }
-          app.innerHTML = await UI.studentDash(session.user);
+          if (!session || session.role !== "student") { push("/login/"); return; }
+          const section = getQuerySection("home");
+          app.innerHTML = await UI.studentDash(session.user, section);
           break;
         }
-        default: {
+        default:
           app.innerHTML = await UI.homePage();
-        }
       }
     } catch (err) {
       app.innerHTML = `<section class="card"><h3>خطا</h3><p>${err.message}</p></section>`;
     }
   }
 
-  function normalizePath(p) {
-    // تصحیح‌های ساده: فاصله‌ها، اسلش پایانی، حروف انگلیسی اضافی
-    let np = p.trim().replace(/\/+$/, "");
-    if (np === "") np = "/";
-    // غلط‌های احتمالی:
-    if (np === "/dashbord/admin") np = "/dash/admin";
-    if (np === "/dashbord/student") np = "/dash/student";
-    return np;
-  }
-
   function attachLoginForm() {
     const form = document.getElementById("login-form");
     const err = document.getElementById("login-error");
     if (!form) return;
-
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       err.textContent = "";
@@ -116,30 +101,12 @@ const Router = (() => {
 
       try {
         const dataset = await Data.getStudents();
-        // بررسی مدیر
         const admin = (dataset.admins || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
-        if (admin) {
-          Session.set({ role: "admin", user: admin });
-          push("/dash/admin");
-          return;
-        }
-        // بررسی دانش‌آموز
+        if (admin) { Session.set({ role: "admin", user: admin }); push("/dash/admin/"); return; }
         const student = (dataset.students || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
-        if (student) {
-          Session.set({ role: "student", user: student });
-          push("/dash/student");
-          return;
-        }
-        // (معلم فعلاً نیازی به پنل ندارد، ولی می‌توانید مشابه اضافه کنید)
-        const teacher = (dataset.teachers || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
-        if (teacher) {
-          // برای آینده: /dash/teacher
-          err.textContent = "ورود معلم فعلاً پشتیبانی نمی‌شود.";
-          return;
-        }
-
-        err.textContent = "ورود ناموفق. اطلاعات را بررسی کنید.";
-      } catch (ex) {
+        if (student) { Session.set({ role: "student", user: student }); push("/dash/student"); return; }
+        err.textContent = "ورود ناموفق. لطفاً اطلاعات را بررسی کنید.";
+      } catch {
         err.textContent = "بارگذاری داده‌ها با خطا مواجه شد.";
       }
     });
@@ -151,7 +118,7 @@ const Router = (() => {
     render();
   }
 
-  return { boot, Session, push };
+  return { boot, push, Session };
 })();
 
 Router.boot();
