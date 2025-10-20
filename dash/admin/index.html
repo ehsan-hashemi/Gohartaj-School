@@ -4,17 +4,24 @@
   <meta charset="utf-8">
   <title>داشبورد مدیر | Gohartaj School</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="پنل مدیریت مدرسه گوهرتاج - جست‌وجوی دانش‌آموزان و برنامه کلاس‌ها">
   <link rel="stylesheet" href="../../assets/css/style.css">
 </head>
 <body>
   <header class="site-header">
     <div class="container header-inner">
+      <div class="brand">
+        <img src="../../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
+        <span class="brand-name">Gohartaj School</span>
+      </div>
       <nav class="top-nav">
         <a href="/" class="nav-link">خانه</a>
         <a href="/news" class="nav-link">اخبار</a>
         <a href="/news/live" class="nav-link">خبر زنده</a>
+        <a href="#" class="nav-link" id="logout-top">خروج</a>
       </nav>
     </div>
+    <div class="gradient-band"></div>
   </header>
 
   <main class="container app-container">
@@ -24,8 +31,10 @@
           <a href="/dash/admin/?section=home" class="side-link" id="link-home">خانه</a>
           <a href="/dash/admin/?section=students" class="side-link" id="link-students">دانش‌آموزان</a>
           <a href="/dash/admin/?section=schedules" class="side-link" id="link-schedules">برنامه کلاس</a>
+          <a href="#" class="side-link" id="logout">خروج</a>
         </nav>
       </aside>
+
       <section class="dash-content">
         <div id="admin-view"></div>
       </section>
@@ -34,7 +43,7 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <div>© 2025 Gohartaj School</div>
+      <div class="footer-copy">© 2025 Gohartaj School — طراحی توسط Ehsan Programming Group</div>
     </div>
   </footer>
 
@@ -42,28 +51,54 @@
   <script src="../../assets/js/common.js"></script>
   <script>
     (async () => {
-      // نشست
-      const sess = sessionStorage.getItem("session");
-      if (!sess) { location.href = "/login/"; return; }
-      const { role, user } = JSON.parse(sess);
-      if (role !== "admin") { location.href = "/login/"; return; }
+      // نشست ماندگار
+      const sessStr = localStorage.getItem("session");
+      if (!sessStr) { location.href = "/login/"; return; }
+      let session;
+      try { session = JSON.parse(sessStr); } catch { location.href = "/login/"; return; }
+      if (!session || session.role !== "admin") { location.href = "/login/"; return; }
+      const user = session.user;
 
-      // ناوبری بخش‌ها
+      // ناوبری بخش فعال
       const url = new URL(location.href);
       const section = url.searchParams.get("section") || "home";
       document.querySelectorAll(".side-link").forEach(a => a.classList.remove("active"));
-      document.getElementById("link-" + section)?.classList.add("active");
+      const activeLink = document.getElementById("link-" + section);
+      if (activeLink) activeLink.classList.add("active");
 
+      // خروج
+      function logout() {
+        localStorage.removeItem("session");
+        location.href = "/login/";
+      }
+      const logoutBtn = document.getElementById("logout");
+      const logoutTop = document.getElementById("logout-top");
+      if (logoutBtn) logoutBtn.addEventListener("click", (e) => { e.preventDefault(); logout(); });
+      if (logoutTop) logoutTop.addEventListener("click", (e) => { e.preventDefault(); logout(); });
+
+      // رندر بخش‌ها
       const view = document.getElementById("admin-view");
 
       if (section === "home") {
         view.innerHTML = `
           <section class="card">
-            <h3>خانه</h3>
+            <div class="panel-head">
+              <h3>خانه</h3>
+              <div class="info-line">
+                <span class="label">مدیر:</span><strong>${user.full_name}</strong>
+              </div>
+            </div>
             <div class="grid-2">
-              <div>
-                <p>به پنل مدیریت خوش آمدید.</p>
-                <p>از طریق منوی سمت چپ، دانش‌آموزان یا برنامه‌های کلاس را مشاهده کنید.</p>
+              <div class="soft-card">
+                <div class="heading-line">
+                  <strong>راهنما</strong>
+                </div>
+                <p class="mt-8">از منوی سمت چپ برای مشاهده دانش‌آموزان و برنامه کلاس‌ها استفاده کنید.</p>
+                <ul class="icon-list mt-12">
+                  <li><span></span><span>جست‌وجو بر اساس نام یا کد ملی</span></li>
+                  <li><span></span><span>فیلتر کلاس‌ها (مثلاً هفتم ۲)</span></li>
+                  <li><span></span><span>مشاهده برنامه هفتگی هر کلاس</span></li>
+                </ul>
               </div>
               <div class="clock-box">
                 <div class="label">زمان جاری:</div>
@@ -92,16 +127,7 @@
         const results = document.getElementById("results");
         const q = document.getElementById("q");
         const cq = document.getElementById("class_q");
-        document.getElementById("search_btn").addEventListener("click", () => {
-          const qv = q.value.trim();
-          const cv = cq.value.trim();
-          const filtered = students.filter(s => {
-            const matchQ = qv ? (s.full_name.includes(qv) || s.national_id.includes(qv)) : true;
-            const matchC = cv ? (s.class_name === cv) : true;
-            return matchQ && matchC;
-          });
-          renderList(filtered);
-        });
+
         function renderList(items) {
           results.innerHTML = items.map(s => `
             <div class="student-item">
@@ -115,6 +141,19 @@
             </div>
           `).join("") || "<p class='note'>نتیجه‌ای یافت نشد.</p>";
         }
+
+        function search() {
+          const qv = q.value.trim();
+          const cv = cq.value.trim();
+          const filtered = students.filter(s => {
+            const matchQ = qv ? (s.full_name.includes(qv) || s.national_id.includes(qv)) : true;
+            const matchC = cv ? (s.class_name === cv) : true;
+            return matchQ && matchC;
+          });
+          renderList(filtered);
+        }
+
+        document.getElementById("search_btn").addEventListener("click", search);
         renderList(students);
       }
 
@@ -136,6 +175,7 @@
         const select = document.getElementById("class_select");
         const btn = document.getElementById("show_schedule_btn");
         const container = document.getElementById("schedule_container");
+
         function renderSchedule(cls) {
           const data = schedules[cls];
           if (!data) { container.innerHTML = "<p class='note'>برنامه‌ای یافت نشد.</p>"; return; }
@@ -152,6 +192,7 @@
             </div>
           `;
         }
+
         btn.addEventListener("click", () => renderSchedule(select.value));
         renderSchedule(select.value);
       }

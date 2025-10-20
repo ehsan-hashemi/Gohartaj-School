@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>جزئیات خبر | Gohartaj School</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <img src="../../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
+        <span class="brand-name">Gohartaj School</span>
+      </div>
+      <nav class="top-nav">
+        <a href="/" class="nav-link">خانه</a>
+        <a href="/news" class="nav-link">اخبار</a>
+        <a href="/news/live" class="nav-link">خبر زنده</a>
+        <a href="/login/" class="nav-btn">ورود</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container app-container">
+    <section class="card">
+      <h3 id="news-title">خبر</h3>
+      <div id="news-media" class="card-media"></div>
+      <div id="news-body" class="card-body"></div>
+      <div id="news-meta" class="card-meta"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>© 2025 Gohartaj School</div>
+    </div>
+  </footer>
+
+  <script src="../../assets/js/data.js"></script>
+  <script src="../../assets/js/common.js"></script>
+  <script>
+    (async () => {
+      // استخراج id از URL: هم /news/item/?id=123 هم /news/123/
+      function resolveId() {
+        const u = new URL(location.href);
+        const qid = u.searchParams.get("id");
+        if (qid) return qid;
+        const parts = location.pathname.split("/").filter(Boolean);
+        // اگر مسیر /news/123/ باشد، بخش دوم عدد است
+        if (parts[0] === "news" && parts[1] && /^\d+$/.test(parts[1])) return parts[1];
+        return null;
+      }
+
+      const id = resolveId();
+      const titleEl = document.getElementById("news-title");
+      const mediaEl = document.getElementById("news-media");
+      const bodyEl = document.getElementById("news-body");
+      const metaEl = document.getElementById("news-meta");
+
+      if (!id) {
+        titleEl.textContent = "خبر یافت نشد";
+        bodyEl.innerHTML = "<p class='note'>شناسه خبر نامشخص است.</p>";
+        return;
+      }
+
+      const all = await Data.getNews();
+      const item = all.find(n => String(n.id) === String(id));
+
+      if (!item) {
+        titleEl.textContent = "خبر یافت نشد";
+        bodyEl.innerHTML = "<p class='note'>شناسه خبر معتبر نیست.</p>";
+        return;
+      }
+
+      titleEl.textContent = item.title || "خبر";
+      bodyEl.innerHTML = `<p>${item.body || ""}</p>`;
+      metaEl.textContent = `${formatDateFA(item.published_at || "")}${item.author ? " • " + item.author : ""}`;
+
+      // رسانه: تصویر و ویدیو (اختیاری)
+      const hasImage = item.image_url && item.image_url.trim();
+      const hasVideo = item.video_url && item.video_url.trim();
+
+      let mediaHtml = "";
+      if (hasImage) {
+        mediaHtml += `<div class="mb-12">${imageOrNone(item.image_url, DefaultIcons.news, "news-image")}</div>`;
+      }
+      if (hasVideo) {
+        // اگر video_url لینک آپارات/یوتیوب embed باشد، مستقیم می‌گذاریم؛ اگر فایل mp4 باشد، video tag
+        if (/\.(mp4|webm|ogg)$/i.test(item.video_url)) {
+          mediaHtml += `
+            <video class="news-image" controls preload="metadata">
+              <source src="${item.video_url}" type="video/${item.video_url.split('.').pop().toLowerCase()}">
+              مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+            </video>
+          `;
+        } else {
+          // فرض بر کد embed یا لینک سرویس
+          mediaHtml += `<div class="mb-12">${item.video_url}</div>`;
+        }
+      }
+      mediaEl.innerHTML = mediaHtml;
+    })();
+  </script>
+</body>
+</html>
