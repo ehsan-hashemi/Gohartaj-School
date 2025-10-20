@@ -1,6 +1,9 @@
-// assets/js/data.js — افزودن پارامتر bust زمانی سبک (اختیاری)
+// data.js — بارگذاری JSON با BASE دقیق، جلوگیری از کش ناخواسته، و bust سبک زمان‌دار
+
 (function (global) {
+  // کش داخلی زمان‌دار (اختیاری)
   const cache = {};
+
   function getBaseToRoot() {
     const path = location.pathname;
     const p = path === "/" ? "/" : path.replace(/\/+$/, "");
@@ -8,18 +11,21 @@
     const depth = parts.length;
     return depth === 0 ? "" : "../".repeat(depth);
   }
-  const BASE = getBaseToRoot();
 
+  const BASE = getBaseToRoot();
   // هر 5 دقیقه یک کلید bust جدید
   const BUST = Math.floor(Date.now() / (5 * 60 * 1000));
 
   async function loadJSON(name) {
     const url = `${BASE}data/${name}?v=${BUST}`;
-    if (cache[url]) return cache[url];
+    // کش داخلی فقط 60 ثانیه معتبر است
+    const c = cache[url];
+    if (c && (Date.now() - c.ts) < 60 * 1000) return c.data;
+
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to load " + url);
     const json = await res.json();
-    cache[url] = json;
+    cache[url] = { data: json, ts: Date.now() };
     return json;
   }
 

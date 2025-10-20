@@ -1,4 +1,4 @@
-// app.js — رندر پاکیزه، هندل bfcache، نشست ماندگار، و مسیر جزئیات خبر
+// app.js — روتینگ کلاینتی پایدار با رندر تمیز، هندل bfcache، و نشست ماندگار
 
 const Router = (() => {
   const routes = {
@@ -25,10 +25,9 @@ const Router = (() => {
   function linkHandler(e) {
     const a = e.target.closest("a[data-link]");
     if (!a) return;
+    const href = a.getAttribute("href") || "";
     // لینک‌های خارجی را عبور بده
-    const href = a.getAttribute("href");
-    const isExternal = /^https?:\/\//.test(href);
-    if (isExternal) return;
+    if (/^https?:\/\//.test(href)) return;
     e.preventDefault();
     push(href);
   }
@@ -59,8 +58,7 @@ const Router = (() => {
 
   async function render() {
     const app = document.getElementById("app");
-    // پاک‌سازی فوری برای جلوگیری از نمایش محتوای قبلی
-    if (app) app.innerHTML = `<section class="card"><p class="muted">در حال بارگذاری...</p></section>`;
+    if (app) app.innerHTML = ""; // پاک‌سازی فوری برای جلوگیری از نمایش محتوای قبلی
 
     const path = normalizePath(location.pathname);
     if (path !== location.pathname) history.replaceState({}, "", path);
@@ -69,15 +67,18 @@ const Router = (() => {
 
     try {
       switch (routeName) {
-        case "home":
+        case "home": {
           app.innerHTML = await UI.homePage();
           break;
-        case "news":
+        }
+        case "news": {
           app.innerHTML = await UI.newsPage();
           break;
-        case "live":
+        }
+        case "live": {
           app.innerHTML = await UI.livePage();
           break;
+        }
         case "news_item": {
           const id = getNewsId();
           app.innerHTML = await UI.newsItemPage(id);
@@ -102,8 +103,9 @@ const Router = (() => {
           app.innerHTML = await UI.studentDash(session.user, section);
           break;
         }
-        default:
+        default: {
           app.innerHTML = await UI.homePage();
+        }
       }
     } catch (err) {
       app.innerHTML = `<section class="card"><h3>خطا</h3><p class="note">${err.message}</p></section>`;
@@ -154,14 +156,9 @@ const Router = (() => {
   function boot() {
     document.addEventListener("click", linkHandler);
     window.addEventListener("popstate", render);
-
-    // هندل bfcache: وقتی صفحه از cache برگشته، دوباره رندر کن
     window.addEventListener("pageshow", (event) => {
-      if (event.persisted) {
-        render();
-      }
+      if (event.persisted) render(); // bfcache بازگشت → رندر دوباره
     });
-
     render();
   }
 

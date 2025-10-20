@@ -1,8 +1,6 @@
-// ui.js - ویوها و کامپوننت‌ها: خانه، اخبار، خبر زنده، جزئیات خبر، ورود، پنل‌ها
-// شامل: مدیریت درست رسانه‌ها، پاک‌سازی متن‌ها، و نمایش ساعت زنده بدون رفرش کل صفحه
+// ui.js — ویوها و کامپوننت‌ها: خانه، اخبار، خبر زنده، جزئیات خبر، ورود، پنل‌ها
 
 const UI = (() => {
-  // تاریخ به فارسی
   function formatDate(dateStr) {
     try {
       const d = new Date(dateStr);
@@ -12,19 +10,16 @@ const UI = (() => {
     }
   }
 
-  // پاک‌سازی رشته‌ها
   function cleanText(t) {
     return Router.cleanText ? Router.cleanText(t) : String(t || "").replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
   }
 
-  // رندر تصویر یا هیچ‌چیز؛ با fallback SVG در onerror
   function imageOrNothing(url, fallbackSvg, cssClass = "") {
     if (!url || url.trim() === "") return "";
     const escaped = url.replace(/"/g, "&quot;");
     return `<img src="${escaped}" alt="" class="${cssClass}" onerror="this.outerHTML='${fallbackSvg.replace(/'/g, "\\'")}'">`;
   }
 
-  // هدر بخش‌ها
   function headerSection(title, actionsHtml = "") {
     return `
       <section class="section-header">
@@ -34,7 +29,6 @@ const UI = (() => {
     `;
   }
 
-  // کارت عمومی
   function card(title, body, meta, imgUrl = "") {
     const imgHtml = imgUrl ? `<div class="card-media">${imageOrNothing(imgUrl, DefaultIcons.news, "news-image")}</div>` : "";
     return `
@@ -49,7 +43,6 @@ const UI = (() => {
     `;
   }
 
-  // ناوبری سمت چپ پنل‌ها
   function leftNav(items) {
     return `
       <aside class="left-nav">
@@ -64,7 +57,6 @@ const UI = (() => {
     `;
   }
 
-  // چیدمان پنل با ناوبری
   function layoutWithNav(navHtml, contentHtml) {
     return `
       <div class="dash-layout">
@@ -76,7 +68,6 @@ const UI = (() => {
     `;
   }
 
-  // صفحه خانه: اطلاعیه‌ها + خلاصه اخبار
   async function homePage() {
     const anns = await Data.getAnnouncements();
     const news = await Data.getNews();
@@ -111,7 +102,6 @@ const UI = (() => {
     `;
   }
 
-  // صفحه همه اخبار با لینک به جزئیات
   async function newsPage() {
     const news = await Data.getNews();
     const items = (news || []).map(n => {
@@ -137,7 +127,6 @@ const UI = (() => {
     `;
   }
 
-  // صفحه خبر زنده
   async function livePage() {
     const live = await Data.getLive();
     const embed = live && live.live_embed_code ? live.live_embed_code : "<p class='note'>پخش زنده در دسترس نیست.</p>";
@@ -154,7 +143,6 @@ const UI = (() => {
     `;
   }
 
-  // صفحه جزئیات خبر
   async function newsItemPage(id) {
     const all = await Data.getNews();
     const item = (all || []).find(n => String(n.id) === String(id));
@@ -173,7 +161,6 @@ const UI = (() => {
     const body = cleanText(item.body || "");
     const meta = `${formatDate(item.published_at || "")}${item.author ? " • " + cleanText(item.author) : ""}`;
 
-    // رسانه: تصویر + ویدیو
     const hasImage = item.image_url && item.image_url.trim();
     const hasVideo = item.video_url && item.video_url.trim();
     let mediaHtml = "";
@@ -194,7 +181,6 @@ const UI = (() => {
       }
     }
 
-    // خبرهای مرتبط ساده: جدیدترین‌ها بغیر از همین
     const related = (all || [])
       .filter(n => String(n.id) !== String(id))
       .map(n => ({ ...n, _date: n.published_at ? new Date(n.published_at).getTime() : 0 }))
@@ -233,7 +219,6 @@ const UI = (() => {
     `;
   }
 
-  // صفحه ورود
   function loginPage() {
     return `
       <section class="login-section">
@@ -257,7 +242,6 @@ const UI = (() => {
     `;
   }
 
-  // پنل مدیر
   async function adminDash(user, section = "home") {
     const data = await Data.getStudents();
     const students = data.students || [];
@@ -296,8 +280,7 @@ const UI = (() => {
           </div>
         </section>
       `;
-      // ساعت زنده
-      requestAnimationFrame(() => attachClock("admin-clock"));
+      requestAnimationFrame(() => liveClock("admin-clock"));
     } else if (section === "students") {
       content = `
         <section class="card">
@@ -310,7 +293,6 @@ const UI = (() => {
           <div id="results" class="student-list"></div>
         </section>
       `;
-      // رندر نتایج با پاک‌سازی متن و جلوگیری از شکست‌های ناخواسته
       requestAnimationFrame(() => {
         const results = document.getElementById("results");
         const q = document.getElementById("q");
@@ -388,11 +370,9 @@ const UI = (() => {
       });
     }
 
-    const html = layoutWithNav(nav, content);
-    return html;
+    return layoutWithNav(nav, content);
   }
 
-  // پنل دانش‌آموز
   async function studentDash(user, section = "home") {
     const schedules = await Data.getSchedules();
     const reportcards = await Data.getReportcards();
@@ -433,7 +413,7 @@ const UI = (() => {
           </div>
         </section>
       `;
-      requestAnimationFrame(() => attachClock("student-clock"));
+      requestAnimationFrame(() => liveClock("student-clock"));
     } else if (section === "profile") {
       content = `
         <section class="card">
@@ -487,19 +467,7 @@ const UI = (() => {
       `;
     }
 
-    const html = layoutWithNav(nav, content);
-    return html;
-  }
-
-  // ساعت زنده: فقط عنصر مشخص را هر ۱ ثانیه آپدیت می‌کند
-  function attachClock(elId) {
-    const el = document.getElementById(elId);
-    if (!el) return;
-    el.textContent = new Date().toLocaleString("fa-IR");
-    const id = setInterval(() => {
-      if (!document.body.contains(el)) { clearInterval(id); return; }
-      el.textContent = new Date().toLocaleString("fa-IR");
-    }, 1000);
+    return layoutWithNav(nav, content);
   }
 
   return {
