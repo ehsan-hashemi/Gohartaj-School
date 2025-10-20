@@ -9,12 +9,15 @@
   src: url("/assets/fonts/Vazir-Regular.ttf");
 }
 
+* {
+  text-decoration: none;
+  font-family: "Vazir";
+}
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
-  text-decoration: none;
-  font-family: "Vazir";
 }
 
 html {
