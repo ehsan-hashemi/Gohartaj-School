@@ -1757,4 +1757,22 @@ pre {
   margin: 0 6px;
 }
 
+/* edit code : */
+
+/* جلوگیری از شکستن نام‌ها و فیلدها به هر کلمه */
+.student-item .student-meta,
+.student-item .student-meta .strong,
+.student-item .student-meta div {
+  white-space: normal;           /* اجازه‌ی شکست طبیعی خطوط (نه براساس \n) */
+  word-break: normal;            /* جلوی break-all را بگیر */
+  overflow-wrap: break-word;     /* فقط در صورت نیاز برای طولانی‌ها بشکن */
+  line-height: 1.8;              /* خوانایی بهتر */
+}
+
+/* اگر جایی به‌صورت عمومی break-all اعمال شده بود، آن را خنثی کن */
+* {
+  word-break: normal;
+  overflow-wrap: anywhere;       /* به‌جای break-all از anywhere استفاده کن */
+}
+
 /* End of stylesheet: crafted to be airy, formal, and uniquely beautiful */
