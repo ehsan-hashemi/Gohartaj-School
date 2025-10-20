@@ -22,26 +22,16 @@
   "students": [
     {
       "id": "student-001",
-      "full_name": "علی رضایی",
-      "national_id": "1111111111",
-      "password": "pass001",
+      "full_name": "سید محمد احسان هاشمی کلاگری",
+      "national_id": "0374352216",
+      "password": "0374352216",
       "role": "student",
-      "class_name": "هفتم ۲",
+      "class_name": "۲",
       "grade_level": "هفتم",
-      "profile_image": ""
+      "profile_image": "https://ehsanpg.ir/icon.jpeg"
     },
     {
       "id": "student-002",
-      "full_name": "مریم احمدی",
-      "national_id": "2222222222",
-      "password": "pass002",
-      "role": "student",
-      "class_name": "هفتم ۲",
-      "grade_level": "هفتم",
-      "profile_image": "imgs/profile/student-002.png"
-    },
-    {
-      "id": "student-003",
       "full_name": "حسین موسوی",
       "national_id": "3333333333",
       "password": "pass003",
