@@ -1,18 +1,30 @@
-// data.js - بارگذاری و کش ساده داده‌ها از فایل‌های JSON محلی
+// data.js - بارگذاری و کش ساده داده‌ها از فایل‌های JSON محلی یا GitHub Pages
 
 const Data = (() => {
   const cache = {};
 
+  // تشخیص Base URL
+  // اگر روی GitHub Pages هستی (مثلاً username.github.io/repo-name/)،
+  // repoName رو اینجا وارد کن:
+  const REPO_NAME = "repo-name"; // 👈 اسم ریپوی خودت رو جایگزین کن
+  let BASE_URL = "";
+
+  if (location.hostname.includes("github.io")) {
+    // روی GitHub Pages
+    BASE_URL = `/${REPO_NAME}`;
+  }
+
   async function loadJSON(path) {
-    if (cache[path]) return cache[path];
-    const res = await fetch(path, { cache: "no-store" });
-    if (!res.ok) throw new Error("Failed to load " + path);
+    const fullPath = `${BASE_URL}/${path}`;
+    if (cache[fullPath]) return cache[fullPath];
+    const res = await fetch(fullPath, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load " + fullPath);
     const json = await res.json();
-    cache[path] = json;
+    cache[fullPath] = json;
     return json;
   }
 
-  // منابع داده (بدون / اول مسیر → مسیر نسبی)
+  // منابع داده
   const sources = {
     announcements: "data/announcements.json",
     news: "data/news.json",
