@@ -1,4 +1,4 @@
-// data.js - بارگذاری و کش ساده داده‌ها از فایل‌های JSON محلی (مسیرهای نسبی)
+// data.js - بارگذاری و کش ساده داده‌ها از فایل‌های JSON محلی
 
 const Data = (() => {
   const cache = {};
@@ -12,13 +12,14 @@ const Data = (() => {
     return json;
   }
 
+  // منابع داده (بدون / اول مسیر → مسیر نسبی)
   const sources = {
-    announcements: "/data/announcements.json",
-    news: "/data/news.json",
-    live: "/data/live.json",
-    students: "/data/students.json",
-    schedules: "/data/schedules.json",
-    reportcards: "/data/reportcards.json"
+    announcements: "data/announcements.json",
+    news: "data/news.json",
+    live: "data/live.json",
+    students: "data/students.json",
+    schedules: "data/schedules.json",
+    reportcards: "data/reportcards.json"
   };
 
   return {
