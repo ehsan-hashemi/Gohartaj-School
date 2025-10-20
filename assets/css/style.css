@@ -13,6 +13,8 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  text-decoration: none;
+  font-family: "Vazir";
 }
 
 html {
@@ -193,7 +195,6 @@ strong {
   border: 1px solid transparent;
   font-weight: 700;
   transition: all .18s ease;
-  text-decoration: none;
 }
 
 .nav-link {
