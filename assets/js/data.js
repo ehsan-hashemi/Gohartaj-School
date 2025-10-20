@@ -6,8 +6,8 @@ const Data = (() => {
   // تشخیص Base URL
   // اگر روی GitHub Pages هستی (مثلاً username.github.io/repo-name/)،
   // repoName رو اینجا وارد کن:
-  const REPO_NAME = "repo-name"; // 👈 اسم ریپوی خودت رو جایگزین کن
-  let BASE_URL = "";
+  const REPO_NAME = "gohartaj-school"; // 👈 اسم ریپوی خودت رو جایگزین کن
+  let BASE_URL = "https://gohartaj.ehsanpg.ir/";
 
   if (location.hostname.includes("github.io")) {
     // روی GitHub Pages
