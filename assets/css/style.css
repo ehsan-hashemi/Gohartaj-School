@@ -332,7 +332,7 @@ strong {
 }
 
 .news-image {
-  width: 80%;
+  width: 100%;
   max-height: 500px;
   object-fit: cover;
   border-radius: var(--radius-md);
