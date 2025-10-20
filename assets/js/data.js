@@ -12,14 +12,14 @@ const Data = (() => {
     return json;
   }
 
-  // منابع داده
+  // منابع داده (بدون / اول مسیر → مسیر نسبی)
   const sources = {
-    announcements: "/data/announcements.json",
-    news: "/data/news.json",
-    live: "/data/live.json",
-    students: "/data/students.json",
-    schedules: "/data/schedules.json",
-    reportcards: "/data/reportcards.json"
+    announcements: "data/announcements.json",
+    news: "data/news.json",
+    live: "data/live.json",
+    students: "data/students.json",
+    schedules: "data/schedules.json",
+    reportcards: "data/reportcards.json"
   };
 
   return {
