@@ -1,27 +1,31 @@
-// data.js - مسیرهای امن برای صفحات مختلف (ریشه و زیرپوشه‌ها)
+// assets/js/data.js — محاسبه‌ی BASE دقیق برای همه‌ی صفحات و پوشه‌ها
+
 (function (global) {
   const cache = {};
 
-  // BASE برای هر صفحه: اگر در ریشه هستیم ""، اگر در زیرپوشه‌ای هستیم "../" یا "../../"
-  function getBase() {
+  // BASE برای رسیدن به /data از هر صفحه
+  function getBaseToRoot() {
+    // مثال‌ها:
+    // /                → ""
+    // /news            → "../"
+    // /news/live/      → "../../"
+    // /login/          → "../"
+    // /dash/admin/     → "../../"
+    // /dash/student    → "../../"
+    // /news/123/       → "../../"
     const path = location.pathname;
-    // نمونه‌ها:
-    // "/": base ""
-    // "/news": base "../" برای دسترسی به /data از /news/
-    // "/news/live/": base "../../"
-    // "/login/": base "../"
-    // "/dash/admin/": base "../../"
-    // "/dash/student": base "../../"
-    // قاعده: تعداد سطح‌های پوشه را بشماریم و "../" به همان تعداد اضافه کنیم تا به ریشه برسیم.
-    const parts = path.split("/").filter(Boolean);
-    const depth = parts.length; // "news" → 1، "news/live" → 2، "dash/admin" → 2
+    // حذف اسلش انتهایی برای شمارش دقیق، به جز ریشه
+    const p = path === "/" ? "/" : path.replace(/\/+$/, "");
+    const parts = p.split("/").filter(Boolean);
+    // تعداد ../ برابر با تعداد بخش‌های پوشه
+    const depth = parts.length;
     return depth === 0 ? "" : "../".repeat(depth);
   }
 
-  const BASE = getBase();
+  const BASE = getBaseToRoot(); // مثل "../" یا "../../" و ...
 
-  async function loadJSON(relPath) {
-    const fullPath = BASE + "data/" + relPath;
+  async function loadJSON(name) {
+    const fullPath = `${BASE}data/${name}`;
     if (cache[fullPath]) return cache[fullPath];
     const res = await fetch(fullPath, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to load " + fullPath);
@@ -32,11 +36,11 @@
 
   const Data = {
     getAnnouncements: () => loadJSON("announcements.json"),
-    getNews: () => loadJSON("news.json"),
-    getLive: () => loadJSON("live.json"),
-    getStudents: () => loadJSON("students.json"),
-    getSchedules: () => loadJSON("schedules.json"),
-    getReportcards: () => loadJSON("reportcards.json")
+    getNews:         () => loadJSON("news.json"),
+    getLive:         () => loadJSON("live.json"),
+    getStudents:     () => loadJSON("students.json"),
+    getSchedules:    () => loadJSON("schedules.json"),
+    getReportcards:  () => loadJSON("reportcards.json")
   };
 
   global.Data = Data;

@@ -47,10 +47,20 @@
   <script src="../../assets/js/common.js"></script>
   <script>
     (async () => {
-      const sess = sessionStorage.getItem("session");
-      if (!sess) { location.href = "/login/"; return; }
-      const { role, user } = JSON.parse(sess);
-      if (role !== "student") { location.href = "/login/"; return; }
+    const sessStr = localStorage.getItem("session");
+    if (!sessStr) { location.href = "/login/"; return; }
+    const { role, user } = JSON.parse(sessStr);
+    if (role !== "admin") { location.href = "/login/"; return; }
+
+    // دکمه خروج (اختیاری در هدر یا سایدبار اضافه کنید)
+    // <a class="side-link" id="logout">خروج</a>
+    const logoutBtn = document.getElementById("logout");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem("session");
+        location.href = "/login/";
+      });
+    }
 
       const url = new URL(location.href);
       const section = url.searchParams.get("section") || "home";
@@ -143,5 +153,6 @@
       }
     })();
   </script>
+
 </body>
 </html>

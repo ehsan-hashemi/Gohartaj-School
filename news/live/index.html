@@ -37,18 +37,50 @@
     </div>
   </footer>
 
-  <script src="../../assets/js/data.js"></script>
-  <script src="../../assets/js/common.js"></script>
-  <script>
-    (async () => {
-      const live = await Data.getLive();
-      document.getElementById("live-wrap").innerHTML = live.live_embed_code || "<p class='note'>پخش زنده در دسترس نیست.</p>";
-      document.getElementById("live-meta").innerHTML = `
-        <h4>${live.title || ""}</h4>
-        <p>${live.body || ""}</p>
-        <small>${formatDateFA(live.published_at || "")}</small>
-      `;
-    })();
-  </script>
+  <!-- ... بالای فایل مثل قبل ... -->
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/common.js"></script>
+<script>
+  (function () {
+    const form = document.getElementById("login-form");
+    const err = document.getElementById("login-error");
+
+    // اگر نشست ذخیره شده است، هدایت کن
+    try {
+      const existing = JSON.parse(localStorage.getItem("session"));
+      if (existing && existing.role) {
+        if (existing.role === "admin") location.href = "/dash/admin/";
+        else if (existing.role === "student") location.href = "/dash/student";
+        return;
+      }
+    } catch {}
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      const full_name = form.full_name.value.trim();
+      const national_id = form.national_id.value.trim();
+      const password = form.password.value;
+      try {
+        const dataset = await Data.getStudents();
+        const admin = (dataset.admins || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
+        if (admin) {
+          localStorage.setItem("session", JSON.stringify({ role: "admin", user: admin }));
+          location.href = "/dash/admin/";
+          return;
+        }
+        const student = (dataset.students || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
+        if (student) {
+          localStorage.setItem("session", JSON.stringify({ role: "student", user: student }));
+          location.href = "/dash/student";
+          return;
+        }
+        err.textContent = "ورود ناموفق. اطلاعات را بررسی کنید.";
+      } catch {
+        err.textContent = "بارگذاری داده‌ها با خطا مواجه شد.";
+      }
+    });
+  })();
+</script>
 </body>
 </html>
