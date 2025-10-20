@@ -1,4 +1,4 @@
-// app.js - روتینگ کلاینتی با مسیرهای دقیق، نشست محلی، و کنترل بخش‌های اختصاصی
+// app.js — رندر پاکیزه، هندل bfcache، نشست ماندگار، و مسیر جزئیات خبر
 
 const Router = (() => {
   const routes = {
@@ -7,7 +7,8 @@ const Router = (() => {
     "/news/live": "live",
     "/login/": "login",
     "/dash/admin/": "dash_admin",
-    "/dash/student": "dash_student" // بدون اسلش پایانی به‌صورت هم‌خانواده پذیرفته می‌شود
+    "/dash/student": "dash_student",
+    "/news/item": "news_item"
   };
 
   const Session = {
@@ -24,17 +25,18 @@ const Router = (() => {
   function linkHandler(e) {
     const a = e.target.closest("a[data-link]");
     if (!a) return;
-    e.preventDefault();
+    // لینک‌های خارجی را عبور بده
     const href = a.getAttribute("href");
+    const isExternal = /^https?:\/\//.test(href);
+    if (isExternal) return;
+    e.preventDefault();
     push(href);
   }
 
   function normalizePath(p) {
     let np = p.trim();
-    // حذف اسلش‌های اضافه انتها برای هماهنگی
     if (np.length > 1) np = np.replace(/\/+$/, "/");
     if (np === "") np = "/";
-    // تصحیح غلط‌های رایج:
     if (np === "/dash/admin") np = "/dash/admin/";
     if (np === "/login") np = "/login/";
     return np;
@@ -46,8 +48,20 @@ const Router = (() => {
     return section || defaultSection;
   }
 
+  function getNewsId() {
+    const url = new URL(location.href);
+    const qid = url.searchParams.get("id");
+    if (qid) return qid;
+    const parts = location.pathname.split("/").filter(Boolean);
+    if (parts[0] === "news" && parts[1] && /^\d+$/.test(parts[1])) return parts[1];
+    return null;
+  }
+
   async function render() {
     const app = document.getElementById("app");
+    // پاک‌سازی فوری برای جلوگیری از نمایش محتوای قبلی
+    if (app) app.innerHTML = `<section class="card"><p class="muted">در حال بارگذاری...</p></section>`;
+
     const path = normalizePath(location.pathname);
     if (path !== location.pathname) history.replaceState({}, "", path);
     const routeName = routes[path] || "home";
@@ -64,10 +78,18 @@ const Router = (() => {
         case "live":
           app.innerHTML = await UI.livePage();
           break;
-        case "login":
+        case "news_item": {
+          const id = getNewsId();
+          app.innerHTML = await UI.newsItemPage(id);
+          break;
+        }
+        case "login": {
+          if (session && session.role === "admin") { push("/dash/admin/"); return; }
+          if (session && session.role === "student") { push("/dash/student"); return; }
           app.innerHTML = UI.loginPage();
           attachLoginForm();
           break;
+        }
         case "dash_admin": {
           if (!session || session.role !== "admin") { push("/login/"); return; }
           const section = getQuerySection("home");
@@ -84,7 +106,7 @@ const Router = (() => {
           app.innerHTML = await UI.homePage();
       }
     } catch (err) {
-      app.innerHTML = `<section class="card"><h3>خطا</h3><p>${err.message}</p></section>`;
+      app.innerHTML = `<section class="card"><h3>خطا</h3><p class="note">${err.message}</p></section>`;
     }
   }
 
@@ -101,10 +123,20 @@ const Router = (() => {
 
       try {
         const dataset = await Data.getStudents();
-        const admin = (dataset.admins || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
+        const admin = (dataset.admins || []).find(u =>
+          cleanText(u.full_name) === cleanText(full_name) &&
+          cleanText(u.national_id) === cleanText(national_id) &&
+          String(u.password) === String(password)
+        );
         if (admin) { Session.set({ role: "admin", user: admin }); push("/dash/admin/"); return; }
-        const student = (dataset.students || []).find(u => u.full_name === full_name && u.national_id === national_id && u.password === password);
+
+        const student = (dataset.students || []).find(u =>
+          cleanText(u.full_name) === cleanText(full_name) &&
+          cleanText(u.national_id) === cleanText(national_id) &&
+          String(u.password) === String(password)
+        );
         if (student) { Session.set({ role: "student", user: student }); push("/dash/student"); return; }
+
         err.textContent = "ورود ناموفق. لطفاً اطلاعات را بررسی کنید.";
       } catch {
         err.textContent = "بارگذاری داده‌ها با خطا مواجه شد.";
@@ -112,13 +144,28 @@ const Router = (() => {
     });
   }
 
+  function cleanText(t) {
+    return String(t || "")
+      .replace(/\s*\n+\s*/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
   function boot() {
     document.addEventListener("click", linkHandler);
     window.addEventListener("popstate", render);
+
+    // هندل bfcache: وقتی صفحه از cache برگشته، دوباره رندر کن
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) {
+        render();
+      }
+    });
+
     render();
   }
 
-  return { boot, push, Session };
+  return { boot, push, Session, cleanText };
 })();
 
 Router.boot();

@@ -1,21 +1,30 @@
-// ui.js - کامپوننت‌ها و ویوها، بدون ایموجی، رسمی، بخش‌بندی واضح
+// ui.js - ویوها و کامپوننت‌ها: خانه، اخبار، خبر زنده، جزئیات خبر، ورود، پنل‌ها
+// شامل: مدیریت درست رسانه‌ها، پاک‌سازی متن‌ها، و نمایش ساعت زنده بدون رفرش کل صفحه
 
 const UI = (() => {
+  // تاریخ به فارسی
   function formatDate(dateStr) {
     try {
       const d = new Date(dateStr);
       return d.toLocaleString("fa-IR");
     } catch {
-      return dateStr;
+      return dateStr || "";
     }
   }
 
+  // پاک‌سازی رشته‌ها
+  function cleanText(t) {
+    return Router.cleanText ? Router.cleanText(t) : String(t || "").replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+  }
+
+  // رندر تصویر یا هیچ‌چیز؛ با fallback SVG در onerror
   function imageOrNothing(url, fallbackSvg, cssClass = "") {
     if (!url || url.trim() === "") return "";
     const escaped = url.replace(/"/g, "&quot;");
     return `<img src="${escaped}" alt="" class="${cssClass}" onerror="this.outerHTML='${fallbackSvg.replace(/'/g, "\\'")}'">`;
   }
 
+  // هدر بخش‌ها
   function headerSection(title, actionsHtml = "") {
     return `
       <section class="section-header">
@@ -25,20 +34,22 @@ const UI = (() => {
     `;
   }
 
+  // کارت عمومی
   function card(title, body, meta, imgUrl = "") {
     const imgHtml = imgUrl ? `<div class="card-media">${imageOrNothing(imgUrl, DefaultIcons.news, "news-image")}</div>` : "";
     return `
       <article class="card">
         ${imgHtml}
         <div class="card-content">
-          <h3 class="card-title">${title}</h3>
-          ${body ? `<p class="card-body">${body}</p>` : ""}
+          <h3 class="card-title">${cleanText(title)}</h3>
+          ${body ? `<p class="card-body">${cleanText(body)}</p>` : ""}
           ${meta ? `<div class="card-meta">${meta}</div>` : ""}
         </div>
       </article>
     `;
   }
 
+  // ناوبری سمت چپ پنل‌ها
   function leftNav(items) {
     return `
       <aside class="left-nav">
@@ -53,6 +64,7 @@ const UI = (() => {
     `;
   }
 
+  // چیدمان پنل با ناوبری
   function layoutWithNav(navHtml, contentHtml) {
     return `
       <div class="dash-layout">
@@ -64,38 +76,68 @@ const UI = (() => {
     `;
   }
 
-  // Pages
+  // صفحه خانه: اطلاعیه‌ها + خلاصه اخبار
   async function homePage() {
     const anns = await Data.getAnnouncements();
     const news = await Data.getNews();
 
-    const annHtml = anns.map(a =>
-      card(a.title, a.body, `${formatDate(a.published_at)}${a.author ? " • " + a.author : ""}`, a.image_url || "")
+    const annHtml = (anns || []).map(a =>
+      card(a.title, a.body, `${formatDate(a.published_at)}${a.author ? " • " + cleanText(a.author) : ""}`, a.image_url || "")
     ).join("");
 
-    const newsHtml = news.map(n =>
-      card(n.title, n.body, formatDate(n.published_at), n.image_url || "")
-    ).join("");
+    const newsHtml = (news || []).map(n => {
+      const meta = `${formatDate(n.published_at)}${n.author ? " • " + cleanText(n.author) : ""}`;
+      const body = cleanText(n.body || "");
+      const summary = body.length > 180 ? body.slice(0, 180) + "…" : body;
+      const img = n.image_url || "";
+      return `
+        <article class="card">
+          ${img ? `<div class="card-media">${imageOrNothing(img, DefaultIcons.news, "news-image")}</div>` : ""}
+          <div class="card-content">
+            <h3 class="card-title"><a href="/news/item/?id=${n.id}" data-link class="link-btn">${cleanText(n.title || "خبر")}</a></h3>
+            <p class="card-body">${summary}</p>
+            <div class="card-meta">${meta}</div>
+          </div>
+        </article>
+      `;
+    }).join("");
 
     return `
       ${headerSection("اطلاعیه‌ها")}
-      <div class="list">${annHtml}</div>
+      <div class="list">${annHtml || "<p class='note'>اطلاعیه‌ای موجود نیست.</p>"}</div>
+
       ${headerSection("اخبار", `<a href="/news" data-link class="btn">مشاهده همه اخبار</a> <a href="/news/live" data-link class="btn btn-secondary">خبر زنده</a>`)}
-      <div class="list">${newsHtml}</div>
+      <div class="list">${newsHtml || "<p class='note'>خبری موجود نیست.</p>"}</div>
     `;
   }
 
+  // صفحه همه اخبار با لینک به جزئیات
   async function newsPage() {
     const news = await Data.getNews();
-    const newsHtml = news.map(n =>
-      card(n.title, n.body, formatDate(n.published_at), n.image_url || "")
-    ).join("");
+    const items = (news || []).map(n => {
+      const meta = `${formatDate(n.published_at)}${n.author ? " • " + cleanText(n.author) : ""}`;
+      const body = cleanText(n.body || "");
+      const summary = body.length > 220 ? body.slice(0, 220) + "…" : body;
+      const img = n.image_url || "";
+      return `
+        <article class="card hover-soft">
+          ${img ? `<div class="card-media">${imageOrNothing(img, DefaultIcons.news, "news-image")}</div>` : ""}
+          <div class="card-content">
+            <h3 class="card-title"><a href="/news/item/?id=${n.id}" data-link class="link-btn">${cleanText(n.title || "خبر")}</a></h3>
+            <p class="card-body">${summary}</p>
+            <div class="card-meta">${meta}</div>
+          </div>
+        </article>
+      `;
+    }).join("");
+
     return `
       ${headerSection("اخبار")}
-      <div class="list">${newsHtml}</div>
+      <div class="list">${items || "<p class='note'>خبری یافت نشد.</p>"}</div>
     `;
   }
 
+  // صفحه خبر زنده
   async function livePage() {
     const live = await Data.getLive();
     const embed = live && live.live_embed_code ? live.live_embed_code : "<p class='note'>پخش زنده در دسترس نیست.</p>";
@@ -105,13 +147,93 @@ const UI = (() => {
         ${embed}
       </div>
       <div class="live-meta">
-        <h3>${live.title || ""}</h3>
-        <p>${live.body || ""}</p>
+        <h3>${cleanText(live.title || "")}</h3>
+        <p>${cleanText(live.body || "")}</p>
         <small>${formatDate(live.published_at || "")}</small>
       </div>
     `;
   }
 
+  // صفحه جزئیات خبر
+  async function newsItemPage(id) {
+    const all = await Data.getNews();
+    const item = (all || []).find(n => String(n.id) === String(id));
+
+    if (!item) {
+      return `
+        ${headerSection("جزئیات خبر")}
+        <section class="card">
+          <h3>خبر یافت نشد</h3>
+          <p class="note">شناسه خبر معتبر نیست یا خبر حذف شده است.</p>
+        </section>
+      `;
+    }
+
+    const title = cleanText(item.title || "خبر");
+    const body = cleanText(item.body || "");
+    const meta = `${formatDate(item.published_at || "")}${item.author ? " • " + cleanText(item.author) : ""}`;
+
+    // رسانه: تصویر + ویدیو
+    const hasImage = item.image_url && item.image_url.trim();
+    const hasVideo = item.video_url && item.video_url.trim();
+    let mediaHtml = "";
+    if (hasImage) {
+      mediaHtml += `<div class="mb-12">${imageOrNothing(item.image_url, DefaultIcons.news, "news-image")}</div>`;
+    }
+    if (hasVideo) {
+      if (/\.(mp4|webm|ogg)$/i.test(item.video_url)) {
+        const type = item.video_url.split(".").pop().toLowerCase();
+        mediaHtml += `
+          <video class="news-image" controls preload="metadata">
+            <source src="${item.video_url}" type="video/${type}">
+            مرورگر شما از پخش ویدیو پشتیبانی نمی‌کند.
+          </video>
+        `;
+      } else {
+        mediaHtml += `<div class="mb-12">${item.video_url}</div>`;
+      }
+    }
+
+    // خبرهای مرتبط ساده: جدیدترین‌ها بغیر از همین
+    const related = (all || [])
+      .filter(n => String(n.id) !== String(id))
+      .map(n => ({ ...n, _date: n.published_at ? new Date(n.published_at).getTime() : 0 }))
+      .sort((a, b) => b._date - a._date)
+      .slice(0, 6);
+
+    const relatedHtml = related.map(n => `
+      <article class="card card-slim lift">
+        ${n.image_url ? `<div class="card-media">${imageOrNothing(n.image_url, DefaultIcons.news, "news-image")}</div>` : ""}
+        <div class="card-content">
+          <h4 class="card-title"><a class="link-btn" href="/news/item/?id=${n.id}" data-link>${cleanText(n.title || "خبر")}</a></h4>
+          <p class="card-body">${cleanText(n.body || "").slice(0, 130)}${(n.body || "").length > 130 ? "…" : ""}</p>
+          <div class="card-meta">${formatDate(n.published_at || "")}${n.author ? " • " + cleanText(n.author) : ""}</div>
+        </div>
+      </article>
+    `).join("");
+
+    return `
+      <nav class="breadcrumbs">
+        <a href="/news" data-link class="link-btn">اخبار</a>
+        <span class="pipe"></span>
+        <span class="muted">جزئیات خبر</span>
+      </nav>
+
+      <section class="card">
+        <h3 class="heading-line">${title}</h3>
+        <div class="card-media">${mediaHtml}</div>
+        <div class="card-body"><p>${body}</p></div>
+        <div class="card-meta">${meta}</div>
+      </section>
+
+      <section class="card">
+        <h4 class="heading-line">خبرهای مرتبط</h4>
+        <div class="grid-auto-fit mt-12">${relatedHtml || "<p class='note'>خبر مرتبطی یافت نشد.</p>"}</div>
+      </section>
+    `;
+  }
+
+  // صفحه ورود
   function loginPage() {
     return `
       <section class="login-section">
@@ -135,6 +257,7 @@ const UI = (() => {
     `;
   }
 
+  // پنل مدیر
   async function adminDash(user, section = "home") {
     const data = await Data.getStudents();
     const students = data.students || [];
@@ -150,11 +273,21 @@ const UI = (() => {
     if (section === "home") {
       content = `
         <section class="card">
-          <h3>خانه</h3>
+          <div class="panel-head">
+            <h3>خانه</h3>
+            <div class="info-line">
+              <span class="label">مدیر:</span><strong>${cleanText(user.full_name)}</strong>
+            </div>
+          </div>
           <div class="grid-2">
-            <div>
-              <p>به پنل مدیریت خوش آمدید.</p>
-              <p>شما می‌توانید دانش‌آموزان را جست‌وجو کنید و برنامه‌های کلاس‌ها را مشاهده کنید.</p>
+            <div class="soft-card">
+              <div class="heading-line"><strong>راهنما</strong></div>
+              <p class="mt-8">از منوی سمت چپ برای مشاهده دانش‌آموزان و برنامه کلاس‌ها استفاده کنید.</p>
+              <ul class="icon-list mt-12">
+                <li><span></span><span>جست‌وجو بر اساس نام یا کد ملی</span></li>
+                <li><span></span><span>فیلتر کلاس‌ها (مثلاً هفتم ۲)</span></li>
+                <li><span></span><span>مشاهده برنامه هفتگی هر کلاس</span></li>
+              </ul>
             </div>
             <div class="clock-box">
               <div class="label">زمان جاری:</div>
@@ -163,6 +296,8 @@ const UI = (() => {
           </div>
         </section>
       `;
+      // ساعت زنده
+      requestAnimationFrame(() => attachClock("admin-clock"));
     } else if (section === "students") {
       content = `
         <section class="card">
@@ -175,48 +310,51 @@ const UI = (() => {
           <div id="results" class="student-list"></div>
         </section>
       `;
+      // رندر نتایج با پاک‌سازی متن و جلوگیری از شکست‌های ناخواسته
       requestAnimationFrame(() => {
         const results = document.getElementById("results");
         const q = document.getElementById("q");
         const cq = document.getElementById("class_q");
-        const btn = document.getElementById("search_btn");
 
         function renderList(items) {
           results.innerHTML = items.map(s => `
             <div class="student-item">
               ${imageOrNothing(s.profile_image, DefaultIcons.profile, "avatar")}
               <div class="student-meta">
-                <div class="strong">${s.full_name}</div>
-                <div>کد ملی: ${s.national_id}</div>
-                <div>کلاس: ${s.class_name || "-"}</div>
-                <div>پایه: ${s.grade_level || "-"}</div>
+                <div class="strong">${cleanText(s.full_name)}</div>
+                <div>کد ملی: ${cleanText(s.national_id)}</div>
+                <div>کلاس: ${cleanText(s.class_name || "-")}</div>
+                <div>پایه: ${cleanText(s.grade_level || "-")}</div>
               </div>
             </div>
           `).join("") || "<p class='note'>نتیجه‌ای یافت نشد.</p>";
         }
 
         function search() {
-          const qv = q.value.trim();
-          const cv = cq.value.trim();
+          const qv = cleanText(q.value || "");
+          const cv = cleanText(cq.value || "");
           const filtered = students.filter(s => {
-            const matchQ = qv ? (s.full_name.includes(qv) || s.national_id.includes(qv)) : true;
-            const matchC = cv ? (s.class_name === cv) : true;
+            const full = cleanText(s.full_name);
+            const nid = cleanText(s.national_id);
+            const cls = cleanText(s.class_name || "");
+            const matchQ = qv ? (full.includes(qv) || nid.includes(qv)) : true;
+            const matchC = cv ? (cls === cv) : true;
             return matchQ && matchC;
           });
           renderList(filtered);
         }
 
-        btn.addEventListener("click", search);
+        document.getElementById("search_btn").addEventListener("click", search);
         renderList(students);
       });
     } else if (section === "schedules") {
-      const classes = Object.keys(schedules);
+      const classes = Object.keys(schedules || {});
       content = `
         <section class="card">
           <h3>برنامه کلاس</h3>
           <div class="filters">
             <select id="class_select">
-              ${classes.map(c => `<option value="${c}">${c}</option>`).join("")}
+              ${classes.map(c => `<option value="${c}">${cleanText(c)}</option>`).join("")}
             </select>
             <button class="btn" id="show_schedule_btn">نمایش برنامه</button>
           </div>
@@ -235,9 +373,9 @@ const UI = (() => {
             <div class="schedule-grid">
               ${Object.entries(data).map(([day, lessons]) => `
                 <div class="schedule-day">
-                  <div class="day-name">${day}</div>
+                  <div class="day-name">${cleanText(day)}</div>
                   <ul class="lesson-list">
-                    ${lessons.map(l => `<li class="lesson-item">${l}</li>`).join("")}
+                    ${lessons.map(l => `<li class="lesson-item">${cleanText(l)}</li>`).join("")}
                   </ul>
                 </div>
               `).join("")}
@@ -251,14 +389,14 @@ const UI = (() => {
     }
 
     const html = layoutWithNav(nav, content);
-    requestAnimationFrame(() => attachAdminClock());
     return html;
   }
 
+  // پنل دانش‌آموز
   async function studentDash(user, section = "home") {
     const schedules = await Data.getSchedules();
     const reportcards = await Data.getReportcards();
-    const myReports = reportcards.filter(r => r.student_national_id === user.national_id);
+    const myReports = (reportcards || []).filter(r => cleanText(r.student_national_id) === cleanText(user.national_id));
 
     const nav = leftNav([
       { href: "/dash/student", text: "خانه", active: section === "home" },
@@ -271,21 +409,31 @@ const UI = (() => {
     if (section === "home") {
       content = `
         <section class="card">
-          <h3>خانه</h3>
+          <div class="panel-head">
+            <h3>خانه</h3>
+            <div class="info-line">
+              <span class="label">دانش‌آموز:</span><strong>${cleanText(user.full_name)}</strong>
+            </div>
+          </div>
           <div class="grid-2">
             <div class="student-status">
               ${imageOrNothing(user.profile_image, DefaultIcons.profile, "avatar xl")}
               <div>
-                <div><span class="label">نام:</span> ${user.full_name}</div>
-                <div><span class="label">کلاس:</span> ${user.class_name || "-"}</div>
-                <div><span class="label">پایه:</span> ${user.grade_level || "-"}</div>
+                <div><span class="label">نام:</span> ${cleanText(user.full_name)}</div>
+                <div><span class="label">کلاس:</span> ${cleanText(user.class_name || "-")}</div>
+                <div><span class="label">پایه:</span> ${cleanText(user.grade_level || "-")}</div>
                 <div><span class="label">زمان:</span> <span id="student-clock" class="clock"></span></div>
-                <div><span class="label">کارنامه:</span> ${myReports.length ? myReports.map(r => `ترم ${r.term}`).join("، ") : "ناموجود"}</div>
+                <div><span class="label">کارنامه:</span> ${myReports.length ? myReports.map(r => `ترم ${cleanText(r.term)}`).join("، ") : "ناموجود"}</div>
               </div>
+            </div>
+            <div class="soft-card">
+              <div class="heading-line"><strong>نکته‌ها</strong></div>
+              <p class="mt-8">برنامه‌ی کلاسی و کارنامه‌هایت را از منوی سمت چپ مشاهده کن.</p>
             </div>
           </div>
         </section>
       `;
+      requestAnimationFrame(() => attachClock("student-clock"));
     } else if (section === "profile") {
       content = `
         <section class="card">
@@ -293,11 +441,11 @@ const UI = (() => {
           <div class="profile-view">
             ${imageOrNothing(user.profile_image, DefaultIcons.profile, "avatar xl")}
             <div class="profile-grid">
-              <div><span class="label">نام و نام خانوادگی:</span> ${user.full_name}</div>
-              <div><span class="label">کد ملی:</span> ${user.national_id}</div>
+              <div><span class="label">نام و نام خانوادگی:</span> ${cleanText(user.full_name)}</div>
+              <div><span class="label">کد ملی:</span> ${cleanText(user.national_id)}</div>
               <div><span class="label">نقش:</span> دانش‌آموز</div>
-              <div><span class="label">پایه:</span> ${user.grade_level || "-"}</div>
-              <div><span class="label">کلاس:</span> ${user.class_name || "-"}</div>
+              <div><span class="label">پایه:</span> ${cleanText(user.grade_level || "-")}</div>
+              <div><span class="label">کلاس:</span> ${cleanText(user.class_name || "-")}</div>
             </div>
           </div>
         </section>
@@ -311,9 +459,9 @@ const UI = (() => {
             <div class="schedule-grid">
               ${Object.entries(scheduleData).map(([day, lessons]) => `
                 <div class="schedule-day">
-                  <div class="day-name">${day}</div>
+                  <div class="day-name">${cleanText(day)}</div>
                   <ul class="lesson-list">
-                    ${lessons.map(l => `<li class="lesson-item">${l}</li>`).join("")}
+                    ${lessons.map(l => `<li class="lesson-item">${cleanText(l)}</li>`).join("")}
                   </ul>
                 </div>
               `).join("")}
@@ -329,7 +477,7 @@ const UI = (() => {
             <ul class="report-list">
               ${myReports.map(r => `
                 <li class="report-item">
-                  <span>ترم ${r.term}</span>
+                  <span>ترم ${cleanText(r.term)}</span>
                   <a class="btn btn-secondary" href="${r.file_url}" target="_blank" rel="noopener">مشاهده</a>
                 </li>
               `).join("")}
@@ -340,22 +488,12 @@ const UI = (() => {
     }
 
     const html = layoutWithNav(nav, content);
-    requestAnimationFrame(() => attachStudentClock());
     return html;
   }
 
-  // clocks
-  function attachAdminClock() {
-    const el = document.getElementById("admin-clock");
-    if (!el) return;
-    el.textContent = new Date().toLocaleString("fa-IR");
-    const id = setInterval(() => {
-      if (!document.body.contains(el)) { clearInterval(id); return; }
-      el.textContent = new Date().toLocaleString("fa-IR");
-    }, 1000);
-  }
-  function attachStudentClock() {
-    const el = document.getElementById("student-clock");
+  // ساعت زنده: فقط عنصر مشخص را هر ۱ ثانیه آپدیت می‌کند
+  function attachClock(elId) {
+    const el = document.getElementById(elId);
     if (!el) return;
     el.textContent = new Date().toLocaleString("fa-IR");
     const id = setInterval(() => {
@@ -368,6 +506,7 @@ const UI = (() => {
     homePage,
     newsPage,
     livePage,
+    newsItemPage,
     loginPage,
     adminDash,
     studentDash

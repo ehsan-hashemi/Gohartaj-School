@@ -1,36 +1,25 @@
-// assets/js/data.js — محاسبه‌ی BASE دقیق برای همه‌ی صفحات و پوشه‌ها
-
+// assets/js/data.js — افزودن پارامتر bust زمانی سبک (اختیاری)
 (function (global) {
   const cache = {};
-
-  // BASE برای رسیدن به /data از هر صفحه
   function getBaseToRoot() {
-    // مثال‌ها:
-    // /                → ""
-    // /news            → "../"
-    // /news/live/      → "../../"
-    // /login/          → "../"
-    // /dash/admin/     → "../../"
-    // /dash/student    → "../../"
-    // /news/123/       → "../../"
     const path = location.pathname;
-    // حذف اسلش انتهایی برای شمارش دقیق، به جز ریشه
     const p = path === "/" ? "/" : path.replace(/\/+$/, "");
     const parts = p.split("/").filter(Boolean);
-    // تعداد ../ برابر با تعداد بخش‌های پوشه
     const depth = parts.length;
     return depth === 0 ? "" : "../".repeat(depth);
   }
+  const BASE = getBaseToRoot();
 
-  const BASE = getBaseToRoot(); // مثل "../" یا "../../" و ...
+  // هر 5 دقیقه یک کلید bust جدید
+  const BUST = Math.floor(Date.now() / (5 * 60 * 1000));
 
   async function loadJSON(name) {
-    const fullPath = `${BASE}data/${name}`;
-    if (cache[fullPath]) return cache[fullPath];
-    const res = await fetch(fullPath, { cache: "no-store" });
-    if (!res.ok) throw new Error("Failed to load " + fullPath);
+    const url = `${BASE}data/${name}?v=${BUST}`;
+    if (cache[url]) return cache[url];
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load " + url);
     const json = await res.json();
-    cache[fullPath] = json;
+    cache[url] = json;
     return json;
   }
 
