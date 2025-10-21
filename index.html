@@ -5,26 +5,22 @@
   <title>Gohartaj School</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Gohartaj School - Announcements, Live, Dashboards">
-  <!-- استایل اصلی -->
-  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/style.css?v=idx-2025-10-21-4">
 </head>
 <body>
   <!-- هدر سایت -->
   <header class="site-header">
     <div class="container header-inner">
       <div class="brand">
-        <!-- لوگو با fallback از common.js -->
-        <img src="/imgs/profile/admin-121.png"
-             alt="لوگو"
-             class="brand-logo"
-             onerror="this.outerHTML=DefaultIcons.logo;">
+        <img src="/imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
         <span class="brand-name">Gohartaj School</span>
       </div>
-      <nav class="top-nav">
+      <nav class="top-nav" id="top-nav">
+        <!-- لینک‌ها با data-link تا SPA هندل کند -->
         <a href="/" data-link class="nav-link">خانه</a>
         <a href="/news" data-link class="nav-link">اخبار</a>
         <a href="/news/live" data-link class="nav-link">خبر زنده</a>
-        <a href="/login/" data-link class="nav-btn">ورود</a>
+        <a href="/login/" data-link class="nav-btn" id="nav-login-btn">ورود</a>
       </nav>
     </div>
     <div class="gradient-band"></div>
@@ -40,18 +36,71 @@
     </div>
   </footer>
 
-  <!-- اسکریپت‌ها (با defer برای ترتیب پایدار و جلوگیری از رندر نسخه قدیمی) -->
-  <script src="/assets/js/common.js" defer></script>
-  <script src="/assets/js/data.js" defer></script>
-  <script src="/assets/js/ui.js" defer></script>
-  <script src="/assets/js/app.js" defer></script>
+  <!-- پاکسازی Service Worker و Cache Storage (اگر قبلاً ثبت شده بودند) -->
+  <script>
+    (function resetSWCachesOnce() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+      }
+      if (window.caches && window.caches.keys) {
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+      }
+    })();
+  </script>
 
-  <!-- Service Worker موقتاً غیرفعال برای حذف اثر نسخه قدیمی index.html
-       اگر نیاز داری بعداً فعالش کنی، ابتدا sw.js را به نسخه network-first صحیح تغییر بده و سپس این بخش را باز کن. -->
+  <!-- اسکریپت‌ها با مسیر مطلق و نسخه‌بندی -->
+  <script src="/assets/js/common.js?v=idx-2025-10-21-4" defer></script>
+  <script src="/assets/js/data.js?v=idx-2025-10-21-4" defer></script>
+  <script src="/assets/js/ui.js?v=idx-2025-10-21-4" defer></script>
+  <script src="/assets/js/app.js?v=idx-2025-10-21-4" defer></script>
+
+  <!-- سازگاری با مسیرهای عمیق خبر (مثلاً /news/123/) و تبدیل به مسیر SPA -->
+  <script>
+    // اگر کاربر مستقیماً روی مسیر الگوی /news/\d+/ لند کند، به SPA مسیر استاندارد هدایت می‌شود
+    (function normalizeDeepNewsPath() {
+      var path = location.pathname;
+      var m = path.match(/^\/news\/(\d+)\/?$/);
+      if (m) {
+        var id = m[1];
+        // تبدیل به مسیر SPA یکسان
+        history.replaceState({}, "", "/news/item/?id=" + id);
+      }
+    })();
+  </script>
+
+  <!-- تبدیل «ورود» به «پنل» در کل سایت در صورت نشست معتبر -->
+  <script>
+    (function setupTopNavButton() {
+      function apply() {
+        try {
+          var btn = document.getElementById("nav-login-btn");
+          if (!btn) return;
+          var s = localStorage.getItem("session");
+          var session = s ? JSON.parse(s) : null;
+          if (session && session.role) {
+            btn.textContent = "پنل";
+            btn.setAttribute("href", session.role === "admin" ? "/dash/admin/" : "/dash/student");
+            btn.classList.add("nav-btn");
+            // لینک پنل هم باید توسط SPA هندل شود
+            btn.setAttribute("data-link", "");
+          } else {
+            btn.textContent = "ورود";
+            btn.setAttribute("href", "/login/");
+            btn.setAttribute("data-link", "");
+          }
+        } catch {}
+      }
+      // اجرا هنگام بارگذاری و هنگام برگشت از bfcache
+      document.addEventListener("DOMContentLoaded", apply);
+      window.addEventListener("pageshow", apply);
+    })();
+  </script>
+
+  <!-- Service Worker فعلاً غیرفعال -->
   <!--
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js?v=idx-2025-10-21-4').catch(() => {});
     }
   </script>
   -->

@@ -5,20 +5,20 @@
   <title>جزئیات خبر | Gohartaj School</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="صفحه جزئیات خبر با تصویر و ویدیو - مدرسه گوهرتاج">
-  <link rel="stylesheet" href="../../assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/style.css?v=newsitem-2025-10-21-3">
 </head>
 <body>
   <header class="site-header">
     <div class="container header-inner">
       <div class="brand">
-        <img src="../../imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" >
+        <img src="/imgs/profile/admin-121.png" alt="لوگو" class="brand-logo" onerror="this.outerHTML=DefaultIcons.logo;">
         <span class="brand-name">Gohartaj School</span>
       </div>
       <nav class="top-nav">
         <a href="/" class="nav-link">خانه</a>
         <a href="/news" class="nav-link">اخبار</a>
         <a href="/news/live" class="nav-link">خبر زنده</a>
-        <a href="/login/" class="nav-btn">ورود</a>
+        <a href="/login/" class="nav-btn" id="nav-login-btn">ورود</a>
       </nav>
     </div>
     <div class="gradient-band"></div>
@@ -47,23 +47,26 @@
   <footer class="site-footer">
     <div class="container footer-inner footer-cols">
       <div class="footer-copy">© 2025 Gohartaj School</div>
-      <div><a href="/login/" class="footer-login-btn">ورود به داشبورد</a></div>
+      <div><a href="/login/" class="footer-login-btn" id="footer-login-btn">ورود به داشبورد</a></div>
     </div>
   </footer>
 
-  <script src="../../assets/js/data.js"></script>
-  <script src="../../assets/js/common.js"></script>
+  <script src="/assets/js/common.js?v=newsitem-2025-10-21-3" defer></script>
+  <script src="/assets/js/data.js?v=newsitem-2025-10-21-3" defer></script>
   <script>
-    (async () => {
-      // استخراج id: پشتیبانی از /news/item/?id=123 و همچنین /news/123/
+    document.addEventListener("DOMContentLoaded", () => {
+      // پشتیبانی از /news/item/?id=123 و /news/123/
       function resolveId() {
         const u = new URL(location.href);
         const qid = u.searchParams.get("id");
         if (qid) return qid;
         const parts = location.pathname.split("/").filter(Boolean);
-        // اگر مسیر /news/123/ باشد
         if (parts[0] === "news" && parts[1] && /^\d+$/.test(parts[1])) return parts[1];
         return null;
+      }
+
+      function cleanText(t) {
+        return String(t || "").replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
       }
 
       function renderMedia(item) {
@@ -74,7 +77,6 @@
           html += `<div class="mb-12">${imageOrNone(item.image_url, DefaultIcons.news, "news-image")}</div>`;
         }
         if (hasVideo) {
-          // اگر فایل ویدیویی باشد، از <video>; اگر embed باشد، همان HTML را قرار بده
           if (/\.(mp4|webm|ogg)$/i.test(item.video_url)) {
             const type = item.video_url.split(".").pop().toLowerCase();
             html += `
@@ -90,64 +92,76 @@
         return html;
       }
 
-      function pickRelated(all, currentId, count = 4) {
-        // ساده: بر اساس جدیدترین‌ها، غیر از آیتم فعلی
-        const items = all
+      function pickRelated(all, currentId, count = 6) {
+        return all
           .filter(n => String(n.id) !== String(currentId))
           .map(n => ({ ...n, _date: n.published_at ? new Date(n.published_at).getTime() : 0 }))
           .sort((a, b) => b._date - a._date)
           .slice(0, count);
-        return items;
       }
 
-      const id = resolveId();
-      const titleEl = document.getElementById("news-title");
-      const mediaEl = document.getElementById("news-media");
-      const bodyEl = document.getElementById("news-body");
-      const metaEl = document.getElementById("news-meta");
-      const relatedEl = document.getElementById("related-list");
+      async function renderItem() {
+        const id = resolveId();
+        const titleEl = document.getElementById("news-title");
+        const mediaEl = document.getElementById("news-media");
+        const bodyEl = document.getElementById("news-body");
+        const metaEl = document.getElementById("news-meta");
+        const relatedEl = document.getElementById("related-list");
 
-      if (!id) {
-        titleEl.textContent = "خبر یافت نشد";
-        bodyEl.innerHTML = "<p class='note'>شناسه خبر نامشخص است.</p>";
-        return;
+        // پاک‌سازی برای جلوگیری از نمایش نسخه قبلی
+        titleEl.textContent = "در حال بارگذاری…";
+        mediaEl.innerHTML = "";
+        bodyEl.innerHTML = "";
+        metaEl.textContent = "";
+        relatedEl.innerHTML = "";
+
+        if (!id) {
+          titleEl.textContent = "خبر یافت نشد";
+          bodyEl.innerHTML = "<p class='note'>شناسه خبر نامشخص است.</p>";
+          return;
+        }
+
+        try {
+          // اجبار به دریافت تازه: استفاده از پارامتر fresh
+          const all = await Data.getNews({ fresh: true });
+
+          const item = (all || []).find(n => String(n.id) === String(id));
+          if (!item) {
+            titleEl.textContent = "خبر یافت نشد";
+            bodyEl.innerHTML = "<p class='note'>شناسه خبر معتبر نیست یا خبر حذف شده است.</p>";
+            return;
+          }
+
+          titleEl.textContent = cleanText(item.title || "خبر");
+          mediaEl.innerHTML = renderMedia(item);
+          bodyEl.innerHTML = `<p>${cleanText(item.body || "")}</p>`;
+          metaEl.textContent = `${formatDateFA(item.published_at || "")}${item.author ? " • " + cleanText(item.author) : ""}`;
+
+          const related = pickRelated(all, id, 6);
+          relatedEl.innerHTML = related.map(n => `
+            <article class="card card-slim lift">
+              ${n.image_url ? `<div class="card-media">${imageOrNone(n.image_url, DefaultIcons.news, "news-image")}</div>` : ""}
+              <div class="card-content">
+                <h4 class="card-title"><a class="link-btn" href="/news/item/?id=${n.id}">${cleanText(n.title || "خبر")}</a></h4>
+                <p class="card-body">${cleanText(n.body || "").slice(0, 130)}${(n.body || "").length > 130 ? "…" : ""}</p>
+                <div class="card-meta">${formatDateFA(n.published_at || "")}${n.author ? " • " + cleanText(n.author) : ""}</div>
+              </div>
+            </article>
+          `).join("") || "<p class='note'>خبر مرتبطی یافت نشد.</p>";
+        } catch (e) {
+          titleEl.textContent = "خطا در بارگذاری خبر";
+          bodyEl.innerHTML = "<p class='note'>بارگذاری داده‌ها با مشکل مواجه شد.</p>";
+        }
       }
 
-      let all;
-      try {
-        all = await Data.getNews();
-      } catch (e) {
-        titleEl.textContent = "خطا در بارگذاری خبر";
-        bodyEl.innerHTML = "<p class='note'>بارگذاری داده‌ها با مشکل مواجه شد.</p>";
-        return;
-      }
+      // اجرای اولیه
+      renderItem();
 
-      const item = all.find(n => String(n.id) === String(id));
-      if (!item) {
-        titleEl.textContent = "خبر یافت نشد";
-        bodyEl.innerHTML = "<p class='note'>شناسه خبر معتبر نیست یا خبر حذف شده است.</p>";
-        return;
-      }
-
-      // رندر خبر
-      titleEl.textContent = item.title || "خبر";
-      mediaEl.innerHTML = renderMedia(item);
-      bodyEl.innerHTML = `<p>${item.body || ""}</p>`;
-      metaEl.textContent = `${formatDateFA(item.published_at || "")}${item.author ? " • " + item.author : ""}`;
-
-      // رندر مرتبط‌ها
-      const related = pickRelated(all, id, 6);
-      relatedEl.innerHTML = related.map(n => `
-        <article class="card card-slim lift">
-          ${n.image_url ? `<div class="card-media">${imageOrNone(n.image_url, DefaultIcons.news, "news-image")}</div>` : ""}
-          <div class="card-content">
-            <h4 class="card-title"><a class="link-btn" href="/news/item/?id=${n.id}">${n.title}</a></h4>
-            <p class="card-body">${(n.body || "").slice(0, 130)}${(n.body || "").length > 130 ? "…" : ""}</p>
-            <div class="card-meta">${formatDateFA(n.published_at || "")}${n.author ? " • " + n.author : ""}</div>
-          </div>
-        </article>
-      `).join("") || "<p class='note'>خبر مرتبطی یافت نشد.</p>";
-    })();
+      // تضمین تازه بودن پس از برگشت bfcache یا ناوبری بدون رفرش
+      window.addEventListener("pageshow", () => {
+        renderItem();
+      });
+    });
   </script>
 </body>
 </html>

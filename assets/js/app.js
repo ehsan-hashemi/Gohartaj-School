@@ -1,4 +1,4 @@
-// app.js — روتینگ کلاینتی پایدار با رندر تمیز، هندل bfcache، و نشست ماندگار
+// app.js — روتینگ SPA با پشتیبانی قطعی از تغییر query (?id=...)، چرخه‌عمر ایمن، و رندر تازه روی bfcache
 
 const Router = (() => {
   const routes = {
@@ -12,13 +12,28 @@ const Router = (() => {
   };
 
   const Session = {
-    get: () => { try { return JSON.parse(localStorage.getItem("session")) || null; } catch { return null; } },
+    get: () => {
+      try { return JSON.parse(localStorage.getItem("session")) || null; } catch { return null; }
+    },
     set: (s) => localStorage.setItem("session", JSON.stringify(s)),
     clear: () => localStorage.removeItem("session")
   };
 
-  function push(path) {
-    history.pushState({}, "", path);
+  // چرخه‌عمر نماها: هر رندر یک mountId یکتا می‌گیرد
+  let currentMountId = 0;
+
+  // نگه‌دارنده teardown برای پاکسازی رویدادها و تایمرها در هر رندر
+  const teardownCallbacks = new Set();
+
+  function registerTeardown(fn) { teardownCallbacks.add(fn); }
+  function runTeardown() {
+    try { teardownCallbacks.forEach(fn => { try { fn(); } catch {} }); } finally { teardownCallbacks.clear(); }
+    if (typeof stopAllClocks === "function") stopAllClocks();
+  }
+
+  function push(href) {
+    // همیشه pushState بزن حتی اگر فقط query تغییر کرده باشد
+    history.pushState({}, "", href);
     render();
   }
 
@@ -28,6 +43,7 @@ const Router = (() => {
     const href = a.getAttribute("href") || "";
     if (/^https?:\/\//.test(href)) return; // لینک خارجی
     e.preventDefault();
+    // حتی اگر path ثابت باشد اما search/query فرق کند، باید push کنیم تا render دوباره اجرا شود
     push(href);
   }
 
@@ -57,88 +73,134 @@ const Router = (() => {
 
   async function render() {
     const app = document.getElementById("app");
-    if (app) app.innerHTML = ""; // پاک‌سازی فوری
+    if (!app) return;
 
+    // teardown نمای قبلی
+    runTeardown();
+
+    // توکن mount یکتا برای این رندر
+    const mountId = ++currentMountId;
+
+    // پاک‌سازی سریع DOM
+    app.innerHTML = "";
+
+    // نرمال‌سازی مسیر
     const path = normalizePath(location.pathname);
     if (path !== location.pathname) history.replaceState({}, "", path);
+
     const routeName = routes[path] || "home";
     const session = Session.get();
 
+    // ابزار بررسی اعتبار mount
+    const stillMounted = () => mountId === currentMountId;
+
+    // ثبت رویداد با teardown و صحت mount
+    function safeAddEvent(el, type, handler, opts) {
+      el.addEventListener(type, handler, opts);
+      registerTeardown(() => {
+        try { el.removeEventListener(type, handler, opts); } catch {}
+      });
+    }
+
+    // بازگرداندن صفحه به بالا
+    window.scrollTo({ top: 0, behavior: "instant" });
+
     try {
       switch (routeName) {
-        case "home":
-          app.innerHTML = await UI.homePage();
+        case "home": {
+          const html = await UI.homePage();
+          if (!stillMounted()) return;
+          app.innerHTML = html;
           break;
-        case "news":
-          app.innerHTML = await UI.newsPage();
+        }
+        case "news": {
+          const html = await UI.newsPage();
+          if (!stillMounted()) return;
+          app.innerHTML = html;
           break;
-        case "live":
-          app.innerHTML = await UI.livePage();
+        }
+        case "live": {
+          const html = await UI.livePage();
+          if (!stillMounted()) return;
+          app.innerHTML = html;
           break;
+        }
         case "news_item": {
+          // مهم: روی هر تغییر query (id جدید) این بخش اجرا می‌شود
           const id = getNewsId();
-          app.innerHTML = await UI.newsItemPage(id);
+          const html = await UI.newsItemPage(id);
+          if (!stillMounted()) return;
+          app.innerHTML = html;
           break;
         }
         case "login": {
           if (session && session.role === "admin") { push("/dash/admin/"); return; }
           if (session && session.role === "student") { push("/dash/student"); return; }
-          app.innerHTML = UI.loginPage();
-          attachLoginForm();
+          const html = UI.loginPage();
+          if (!stillMounted()) return;
+          app.innerHTML = html;
+
+          const form = document.getElementById("login-form");
+          const err = document.getElementById("login-error");
+          if (form) {
+            const onSubmit = async (e) => {
+              e.preventDefault();
+              if (!stillMounted()) return;
+              err.textContent = "";
+              const full_name = form.full_name.value.trim();
+              const national_id = form.national_id.value.trim();
+              const password = form.password.value;
+              try {
+                const dataset = await Data.getStudents({ fresh: true });
+                if (!stillMounted()) return;
+                const admin = (dataset.admins || []).find(u =>
+                  cleanText(u.full_name) === cleanText(full_name) &&
+                  cleanText(u.national_id) === cleanText(national_id) &&
+                  String(u.password) === String(password)
+                );
+                if (admin) { Session.set({ role: "admin", user: admin }); push("/dash/admin/"); return; }
+                const student = (dataset.students || []).find(u =>
+                  cleanText(u.full_name) === cleanText(full_name) &&
+                  cleanText(u.national_id) === cleanText(national_id) &&
+                  String(u.password) === String(password)
+                );
+                if (student) { Session.set({ role: "student", user: student }); push("/dash/student"); return; }
+                err.textContent = "ورود ناموفق. لطفاً اطلاعات را بررسی کنید.";
+              } catch {
+                if (!stillMounted()) return;
+                err.textContent = "بارگذاری داده‌ها با خطا مواجه شد.";
+              }
+            };
+            safeAddEvent(form, "submit", onSubmit);
+          }
           break;
         }
         case "dash_admin": {
           if (!session || session.role !== "admin") { push("/login/"); return; }
           const section = getQuerySection("home");
-          app.innerHTML = await UI.adminDash(session.user, section);
+          const html = await UI.adminDash(session.user, section);
+          if (!stillMounted()) return;
+          app.innerHTML = html;
           break;
         }
         case "dash_student": {
           if (!session || session.role !== "student") { push("/login/"); return; }
           const section = getQuerySection("home");
-          app.innerHTML = await UI.studentDash(session.user, section);
+          const html = await UI.studentDash(session.user, section);
+          if (!stillMounted()) return;
+          app.innerHTML = html;
           break;
         }
-        default:
-          app.innerHTML = await UI.homePage();
+        default: {
+          const html = await UI.homePage();
+          if (!stillMounted()) return;
+          app.innerHTML = html;
+        }
       }
     } catch (err) {
+      if (!stillMounted()) return;
       app.innerHTML = `<section class="card"><h3>خطا</h3><p class="note">${err.message}</p></section>`;
     }
-  }
-
-  function attachLoginForm() {
-    const form = document.getElementById("login-form");
-    const err = document.getElementById("login-error");
-    if (!form) return;
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      err.textContent = "";
-      const full_name = form.full_name.value.trim();
-      const national_id = form.national_id.value.trim();
-      const password = form.password.value;
-
-      try {
-        const dataset = await Data.getStudents();
-        const admin = (dataset.admins || []).find(u =>
-          cleanText(u.full_name) === cleanText(full_name) &&
-          cleanText(u.national_id) === cleanText(national_id) &&
-          String(u.password) === String(password)
-        );
-        if (admin) { Session.set({ role: "admin", user: admin }); push("/dash/admin/"); return; }
-
-        const student = (dataset.students || []).find(u =>
-          cleanText(u.full_name) === cleanText(full_name) &&
-          cleanText(u.national_id) === cleanText(national_id) &&
-          String(u.password) === String(password)
-        );
-        if (student) { Session.set({ role: "student", user: student }); push("/dash/student"); return; }
-
-        err.textContent = "ورود ناموفق. لطفاً اطلاعات را بررسی کنید.";
-      } catch {
-        err.textContent = "بارگذاری داده‌ها با خطا مواجه شد.";
-      }
-    });
   }
 
   function cleanText(t) {
@@ -149,15 +211,16 @@ const Router = (() => {
   }
 
   function boot() {
-    document.addEventListener("click", linkHandler);
+    document.addEventListener("click", linkHandler, { capture: true });
     window.addEventListener("popstate", render);
-    window.addEventListener("pageshow", (event) => {
-      if (event.persisted) render(); // هندل bfcache
+    window.addEventListener("pageshow", () => {
+      // در بازگشت bfcache، رندر تازه
+      render();
     });
     render();
   }
 
-  return { boot, push, Session, cleanText };
+  return { boot, push, Session, cleanText, registerTeardown };
 })();
 
 Router.boot();

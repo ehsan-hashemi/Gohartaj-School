@@ -1,36 +1,31 @@
-// data.js — بارگذاری JSON از مسیر مطلق ریشه، حذف BASE نسبی، و bust سبک زمان‌دار
+// data.js — بارگذاری JSON از مسیر مطلق، حذف کش داخلی اختلال‌زا، و امکان اجبار تازه بودن
 
 (function (global) {
-  const cache = {};
-
-  // هر 5 دقیقه یک کلید bust جدید (برای دور زدن کش‌های بین‌راهی)
+  // تولید کلید bust یکتا هنگام درخواست (اختیاری برای اجبار تازه بودن)
   function bustKey() {
-    return Math.floor(Date.now() / (5 * 60 * 1000));
+    return `${Date.now()}-${Math.round(performance.now())}`;
   }
 
-  async function loadJSON(name) {
-    // مسیر مطلق: همیشه /data/... تا مستقل از مسیر فعلی صفحه کار کند
-    const url = `/data/${name}?v=${bustKey()}`;
+  async function loadJSON(name, options = {}) {
+    const fresh = !!options.fresh; // اگر true باشد، به‌اجبار از شبکه تازه می‌گیرد
+    const v = fresh ? bustKey() : Math.floor(Date.now() / (5 * 60 * 1000)); // 5 دقیقه‌ای، یا یکتا
+    const url = `/data/${name}?v=${v}`;
 
-    // کش داخلی فقط 60 ثانیه معتبر است
-    const c = cache[url];
-    if (c && (Date.now() - c.ts) < 60 * 1000) return c.data;
-
-    // اجبار به دریافت تازه از شبکه
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: fresh ? { "Cache-Control": "no-cache" } : {}
+    });
     if (!res.ok) throw new Error("Failed to load " + url);
-    const json = await res.json();
-    cache[url] = { data: json, ts: Date.now() };
-    return json;
+    return await res.json();
   }
 
   const Data = {
-    getAnnouncements: () => loadJSON("announcements.json"),
-    getNews:         () => loadJSON("news.json"),
-    getLive:         () => loadJSON("live.json"),
-    getStudents:     () => loadJSON("students.json"),
-    getSchedules:    () => loadJSON("schedules.json"),
-    getReportcards:  () => loadJSON("reportcards.json")
+    getAnnouncements: (opts) => loadJSON("announcements.json", opts),
+    getNews:          (opts) => loadJSON("news.json", opts),
+    getLive:          (opts) => loadJSON("live.json", opts),
+    getStudents:      (opts) => loadJSON("students.json", opts),
+    getSchedules:     (opts) => loadJSON("schedules.json", opts),
+    getReportcards:   (opts) => loadJSON("reportcards.json", opts)
   };
 
   global.Data = Data;

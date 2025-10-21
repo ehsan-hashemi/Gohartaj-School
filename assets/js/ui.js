@@ -1,4 +1,4 @@
-// ui.js — ویوها و کامپوننت‌ها: خانه، اخبار با جست‌وجو/مرتب‌سازی/صفحه‌بندی، خبر زنده، جزئیات خبر، ورود، پنل‌ها
+// ui.js — ویوها با تازه‌سازی تضمینی و سازگار با چرخه‌عمر Router
 
 const UI = (() => {
   function formatDate(dateStr) {
@@ -9,10 +9,13 @@ const UI = (() => {
     return Router.cleanText ? Router.cleanText(t) : String(t || "").replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
   }
 
-  function imageOrNothing(url, fallbackSvg, cssClass = "") {
+  function imageOrNothing(url, fallbackSvg, cssClass = "", hard = false) {
     if (!url || url.trim() === "") return "";
     const escaped = url.replace(/"/g, "&quot;");
-    return `<img src="${escaped}" alt="" class="${cssClass}" onerror="this.outerHTML='${fallbackSvg.replace(/'/g, "\\'")}'">`;
+    const busted = typeof bustUrl === "function"
+      ? bustUrl(escaped, { mode: hard ? "hard" : "soft", ttlMinutes: 5 })
+      : escaped;
+    return `<img src="${busted}" alt="" class="${cssClass}" onerror="this.outerHTML='${fallbackSvg.replace(/'/g, "\\'")}'">`;
   }
 
   function headerSection(title, actionsHtml = "") {
@@ -63,9 +66,10 @@ const UI = (() => {
     `;
   }
 
+  // خانه — تازه
   async function homePage() {
-    const anns = await Data.getAnnouncements();
-    const news = await Data.getNews();
+    const anns = await Data.getAnnouncements({ fresh: true });
+    const news = await Data.getNews({ fresh: true });
 
     const annHtml = (anns || []).map(a =>
       card(a.title, a.body, `${formatDate(a.published_at)}${a.author ? " • " + cleanText(a.author) : ""}`, a.image_url || "")
@@ -97,18 +101,16 @@ const UI = (() => {
     `;
   }
 
-  // نسخه کامل صفحه اخبار با جست‌وجو، مرتب‌سازی، صفحه‌بندی
+  // اخبار — تازه
   async function newsPage() {
     const PAGE_SIZE = 6;
-
-    let items = await Data.getNews();
+    let items = await Data.getNews({ fresh: true });
     items = (items || []).map(n => ({
       ...n,
       _date: n.published_at ? new Date(n.published_at).getTime() : 0,
       _title: cleanText(n.title || "خبر"),
       _body: cleanText(n.body || "")
-    }));
-    items.sort((a, b) => b._date - a._date); // پیش‌فرض: جدیدترین
+    })).sort((a, b) => b._date - a._date);
 
     const html = `
       ${headerSection("اخبار")}
@@ -133,7 +135,7 @@ const UI = (() => {
       </section>
     `;
 
-    // اتصال رویدادها پس از تزریق
+    // رویدادها + teardown مرکزی
     requestAnimationFrame(() => {
       const listEl = document.getElementById("news-list");
       const pagerEl = document.getElementById("pager");
@@ -176,11 +178,9 @@ const UI = (() => {
         `).join("");
 
         pagerEl.querySelectorAll(".page-link").forEach(a => {
-          a.addEventListener("click", (e) => {
-            e.preventDefault();
-            const p = parseInt(a.getAttribute("data-page"), 10);
-            renderPage(p);
-          });
+          const onClick = (e) => { e.preventDefault(); const p = parseInt(a.getAttribute("data-page"), 10); renderPage(p); };
+          a.addEventListener("click", onClick);
+          Router.registerTeardown(() => a.removeEventListener("click", onClick));
         });
       }
 
@@ -188,14 +188,29 @@ const UI = (() => {
         const q = cleanText(qEl.value || "");
         if (!q) { filtered = items.slice(); renderPage(1); return; }
         const qa = q.toLowerCase();
-        filtered = items.filter(n => (String(n._title).toLowerCase().includes(qa) || String(n._body).toLowerCase().includes(qa)));
+        filtered = items.filter(n =>
+          String(n._title).toLowerCase().includes(qa) ||
+          String(n._body).toLowerCase().includes(qa)
+        );
         renderPage(1);
       }
 
-      qBtn.addEventListener("click", applySearch);
-      qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") applySearch(); });
-      sortNewest.addEventListener("click", () => { items.sort((a,b) => b._date - a._date); applySearch(); });
-      sortOldest.addEventListener("click", () => { items.sort((a,b) => a._date - b._date); applySearch(); });
+      const onSearchBtn = () => applySearch();
+      const onSearchEnter = (e) => { if (e.key === "Enter") applySearch(); };
+      const onNewest = () => { items.sort((a,b) => b._date - a._date); applySearch(); };
+      const onOldest = () => { items.sort((a,b) => a._date - b._date); applySearch(); };
+
+      qBtn.addEventListener("click", onSearchBtn);
+      qEl.addEventListener("keydown", onSearchEnter);
+      sortNewest.addEventListener("click", onNewest);
+      sortOldest.addEventListener("click", onOldest);
+
+      Router.registerTeardown(() => {
+        qBtn.removeEventListener("click", onSearchBtn);
+        qEl.removeEventListener("keydown", onSearchEnter);
+        sortNewest.removeEventListener("click", onNewest);
+        sortOldest.removeEventListener("click", onOldest);
+      });
 
       renderPage(1);
     });
@@ -203,8 +218,9 @@ const UI = (() => {
     return html;
   }
 
+  // خبر زنده — تازه
   async function livePage() {
-    const live = await Data.getLive();
+    const live = await Data.getLive({ fresh: true });
     const embed = live && live.live_embed_code ? live.live_embed_code : "<p class='note'>پخش زنده در دسترس نیست.</p>";
     return `
       ${headerSection("خبر زنده")}
@@ -219,8 +235,9 @@ const UI = (() => {
     `;
   }
 
+  // جزئیات خبر — داده‌های تازه و bust سخت برای رسانه‌ها
   async function newsItemPage(id) {
-    const all = await Data.getNews();
+    const all = await Data.getNews({ fresh: true });
     const item = (all || []).find(n => String(n.id) === String(id));
 
     if (!item) {
@@ -241,7 +258,8 @@ const UI = (() => {
     const hasVideo = item.video_url && item.video_url.trim();
     let mediaHtml = "";
     if (hasImage) {
-      mediaHtml += `<div class="mb-12">${imageOrNothing(item.image_url, DefaultIcons.news, "news-image")}</div>`;
+      // برای صفحه آیتم خبر، bust سخت روی تصویر اعمال می‌کنیم
+      mediaHtml += `<div class="mb-12">${imageOrNothing(item.image_url, DefaultIcons.news, "news-image", true)}</div>`;
     }
     if (hasVideo) {
       if (/\.(mp4|webm|ogg)$/i.test(item.video_url)) {
@@ -301,13 +319,13 @@ const UI = (() => {
         <form id="login-form" class="card form-card">
           <h2>ورود به داشبورد</h2>
           <label>نام و نام خانوادگی
-            <input type="text" name="full_name" required placeholder="مثلاً علی رضایی">
+            <input type="text" name="full_name" required placeholder="مثلاً علی رضایی" autocomplete="name">
           </label>
           <label>کد ملی
-            <input type="text" name="national_id" required placeholder="مثلاً 1111111111">
+            <input type="text" name="national_id" required placeholder="مثلاً 1111111111" inputmode="numeric" autocomplete="off">
           </label>
           <label>رمز عبور
-            <input type="password" name="password" required placeholder="رمز عبور">
+            <input type="password" name="password" required placeholder="رمز عبور" autocomplete="current-password">
           </label>
           <div class="form-actions">
             <button type="submit" class="btn">ورود</button>
@@ -319,9 +337,9 @@ const UI = (() => {
   }
 
   async function adminDash(user, section = "home") {
-    const data = await Data.getStudents();
+    const data = await Data.getStudents({ fresh: true });
     const students = data.students || [];
-    const schedules = await Data.getSchedules();
+    const schedules = await Data.getSchedules({ fresh: true });
 
     const nav = leftNav([
       { href: "/dash/admin/", text: "خانه", active: section === "home" },
@@ -402,7 +420,10 @@ const UI = (() => {
           renderList(filtered);
         }
 
-        document.getElementById("search_btn").addEventListener("click", search);
+        const searchBtn = document.getElementById("search_btn");
+        searchBtn.addEventListener("click", search);
+        Router.registerTeardown(() => searchBtn.removeEventListener("click", search));
+
         renderList(students);
       });
     } else if (section === "schedules") {
@@ -441,7 +462,10 @@ const UI = (() => {
           `;
         }
 
-        btn.addEventListener("click", () => renderSchedule(select.value));
+        const onClick = () => renderSchedule(select.value);
+        btn.addEventListener("click", onClick);
+        Router.registerTeardown(() => btn.removeEventListener("click", onClick));
+
         renderSchedule(select.value);
       });
     }
@@ -450,8 +474,8 @@ const UI = (() => {
   }
 
   async function studentDash(user, section = "home") {
-    const schedules = await Data.getSchedules();
-    const reportcards = await Data.getReportcards();
+    const schedules = await Data.getSchedules({ fresh: true });
+    const reportcards = await Data.getReportcards({ fresh: true });
     const myReports = (reportcards || []).filter(r => cleanText(r.student_national_id) === cleanText(user.national_id));
 
     const nav = leftNav([
