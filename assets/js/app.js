@@ -26,8 +26,7 @@ const Router = (() => {
     const a = e.target.closest("a[data-link]");
     if (!a) return;
     const href = a.getAttribute("href") || "";
-    // لینک‌های خارجی را عبور بده
-    if (/^https?:\/\//.test(href)) return;
+    if (/^https?:\/\//.test(href)) return; // لینک خارجی
     e.preventDefault();
     push(href);
   }
@@ -58,7 +57,7 @@ const Router = (() => {
 
   async function render() {
     const app = document.getElementById("app");
-    if (app) app.innerHTML = ""; // پاک‌سازی فوری برای جلوگیری از نمایش محتوای قبلی
+    if (app) app.innerHTML = ""; // پاک‌سازی فوری
 
     const path = normalizePath(location.pathname);
     if (path !== location.pathname) history.replaceState({}, "", path);
@@ -67,18 +66,15 @@ const Router = (() => {
 
     try {
       switch (routeName) {
-        case "home": {
+        case "home":
           app.innerHTML = await UI.homePage();
           break;
-        }
-        case "news": {
+        case "news":
           app.innerHTML = await UI.newsPage();
           break;
-        }
-        case "live": {
+        case "live":
           app.innerHTML = await UI.livePage();
           break;
-        }
         case "news_item": {
           const id = getNewsId();
           app.innerHTML = await UI.newsItemPage(id);
@@ -103,9 +99,8 @@ const Router = (() => {
           app.innerHTML = await UI.studentDash(session.user, section);
           break;
         }
-        default: {
+        default:
           app.innerHTML = await UI.homePage();
-        }
       }
     } catch (err) {
       app.innerHTML = `<section class="card"><h3>خطا</h3><p class="note">${err.message}</p></section>`;
@@ -157,7 +152,7 @@ const Router = (() => {
     document.addEventListener("click", linkHandler);
     window.addEventListener("popstate", render);
     window.addEventListener("pageshow", (event) => {
-      if (event.persisted) render(); // bfcache بازگشت → رندر دوباره
+      if (event.persisted) render(); // هندل bfcache
     });
     render();
   }

@@ -1,27 +1,22 @@
-// data.js — بارگذاری JSON با BASE دقیق، جلوگیری از کش ناخواسته، و bust سبک زمان‌دار
+// data.js — بارگذاری JSON از مسیر مطلق ریشه، حذف BASE نسبی، و bust سبک زمان‌دار
 
 (function (global) {
-  // کش داخلی زمان‌دار (اختیاری)
   const cache = {};
 
-  function getBaseToRoot() {
-    const path = location.pathname;
-    const p = path === "/" ? "/" : path.replace(/\/+$/, "");
-    const parts = p.split("/").filter(Boolean);
-    const depth = parts.length;
-    return depth === 0 ? "" : "../".repeat(depth);
+  // هر 5 دقیقه یک کلید bust جدید (برای دور زدن کش‌های بین‌راهی)
+  function bustKey() {
+    return Math.floor(Date.now() / (5 * 60 * 1000));
   }
 
-  const BASE = getBaseToRoot();
-  // هر 5 دقیقه یک کلید bust جدید
-  const BUST = Math.floor(Date.now() / (5 * 60 * 1000));
-
   async function loadJSON(name) {
-    const url = `${BASE}data/${name}?v=${BUST}`;
+    // مسیر مطلق: همیشه /data/... تا مستقل از مسیر فعلی صفحه کار کند
+    const url = `/data/${name}?v=${bustKey()}`;
+
     // کش داخلی فقط 60 ثانیه معتبر است
     const c = cache[url];
     if (c && (Date.now() - c.ts) < 60 * 1000) return c.data;
 
+    // اجبار به دریافت تازه از شبکه
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to load " + url);
     const json = await res.json();

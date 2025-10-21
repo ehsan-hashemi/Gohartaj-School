@@ -5,13 +5,19 @@
   <title>Gohartaj School</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Gohartaj School - Announcements, Live, Dashboards">
+  <!-- استایل اصلی -->
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
-  <header class="site-header sticky">
-    <div class="header-inner container">
+  <!-- هدر سایت -->
+  <header class="site-header">
+    <div class="container header-inner">
       <div class="brand">
-        <img src="https://ehsanpg.ir/icon.jpeg" alt="لوگو" class="brand-logo" >
+        <!-- لوگو با fallback از common.js -->
+        <img src="/imgs/profile/admin-121.png"
+             alt="لوگو"
+             class="brand-logo"
+             onerror="this.outerHTML=DefaultIcons.logo;">
         <span class="brand-name">Gohartaj School</span>
       </div>
       <nav class="top-nav">
@@ -21,42 +27,33 @@
         <a href="/login/" data-link class="nav-btn">ورود</a>
       </nav>
     </div>
+    <div class="gradient-band"></div>
   </header>
 
-  <main id="app" class="app-container container">
-    <!-- محتوای صفحات با JS اینجا رندر می‌شود -->
-  </main>
+  <!-- ناحیه رندر SPA -->
+  <main id="app" class="container app-container"></main>
 
+  <!-- فوتر سایت -->
   <footer class="site-footer">
-    <div class="footer-inner container">
-      <div class="footer-actions">
-        <a href="/login/" data-link class="footer-login-btn">ورود به داشبورد</a>
-      </div>
-      <div class="footer-copy">
-        © 2025 Gohartaj School — طراحی و توسعه توسط Ehsan Programming Group
-      </div>
+    <div class="container footer-inner">
+      <div class="footer-copy">© 2025 Gohartaj School — طراحی و توسعه توسط Ehsan Programming Group</div>
     </div>
   </footer>
 
-  <script>
-    // آیکون‌های پیش‌فرض SVG برای جایگزین تصاویر خراب
-    const DefaultIcons = {
-      profile: '<svg class="avatar-fallback" viewBox="0 0 24 24" width="52" height="52" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#9aa4b2"></circle><path d="M4 22c0-4 4-7 8-7s8 3 8 7" fill="#c7cdd6"></path><circle cx="12" cy="8" r="4" fill="none" stroke="#6b7280" stroke-width="1.5"></circle><path d="M4 22c0-4 4-7 8-7s8 3 8 7" fill="none" stroke="#6b7280" stroke-width="1.5"></path></svg>',
-      news: '<svg class="news-fallback" viewBox="0 0 24 24" width="80" height="48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" fill="#c7cdd6"></rect><rect x="5" y="6" width="10" height="3" fill="#9aa4b2"></rect><rect x="5" y="10" width="14" height="2" fill="#9aa4b2"></rect><rect x="5" y="13" width="8" height="2" fill="#9aa4b2"></rect></svg>',
-      logo: '<svg class="brand-logo-fallback" viewBox="0 0 48 48" width="36" height="36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="6" y="6" width="36" height="36" rx="8" fill="#0a8f66"></rect><path d="M14 30l10-12 10 12" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'
-    };
-  </script>
+  <!-- اسکریپت‌ها (با defer برای ترتیب پایدار و جلوگیری از رندر نسخه قدیمی) -->
+  <script src="/assets/js/common.js" defer></script>
+  <script src="/assets/js/data.js" defer></script>
+  <script src="/assets/js/ui.js" defer></script>
+  <script src="/assets/js/app.js" defer></script>
 
-  <script src="/assets/js/data.js"></script>
-  <script src="/assets/js/ui.js"></script>
-  <script src="/assets/js/app.js"></script>
+  <!-- Service Worker موقتاً غیرفعال برای حذف اثر نسخه قدیمی index.html
+       اگر نیاز داری بعداً فعالش کنی، ابتدا sw.js را به نسخه network-first صحیح تغییر بده و سپس این بخش را باز کن. -->
+  <!--
   <script>
-    // ثبت Service Worker برای جلوگیری از 404 در رفرش مسیرها
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
-      });
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   </script>
+  -->
 </body>
 </html>

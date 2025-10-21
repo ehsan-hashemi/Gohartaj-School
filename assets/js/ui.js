@@ -1,13 +1,8 @@
-// ui.js — ویوها و کامپوننت‌ها: خانه، اخبار، خبر زنده، جزئیات خبر، ورود، پنل‌ها
+// ui.js — ویوها و کامپوننت‌ها: خانه، اخبار با جست‌وجو/مرتب‌سازی/صفحه‌بندی، خبر زنده، جزئیات خبر، ورود، پنل‌ها
 
 const UI = (() => {
   function formatDate(dateStr) {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleString("fa-IR");
-    } catch {
-      return dateStr || "";
-    }
+    try { return new Date(dateStr).toLocaleString("fa-IR"); } catch { return dateStr || ""; }
   }
 
   function cleanText(t) {
@@ -102,29 +97,110 @@ const UI = (() => {
     `;
   }
 
+  // نسخه کامل صفحه اخبار با جست‌وجو، مرتب‌سازی، صفحه‌بندی
   async function newsPage() {
-    const news = await Data.getNews();
-    const items = (news || []).map(n => {
-      const meta = `${formatDate(n.published_at)}${n.author ? " • " + cleanText(n.author) : ""}`;
-      const body = cleanText(n.body || "");
-      const summary = body.length > 220 ? body.slice(0, 220) + "…" : body;
-      const img = n.image_url || "";
-      return `
-        <article class="card hover-soft">
-          ${img ? `<div class="card-media">${imageOrNothing(img, DefaultIcons.news, "news-image")}</div>` : ""}
-          <div class="card-content">
-            <h3 class="card-title"><a href="/news/item/?id=${n.id}" data-link class="link-btn">${cleanText(n.title || "خبر")}</a></h3>
-            <p class="card-body">${summary}</p>
-            <div class="card-meta">${meta}</div>
-          </div>
-        </article>
-      `;
-    }).join("");
+    const PAGE_SIZE = 6;
 
-    return `
+    let items = await Data.getNews();
+    items = (items || []).map(n => ({
+      ...n,
+      _date: n.published_at ? new Date(n.published_at).getTime() : 0,
+      _title: cleanText(n.title || "خبر"),
+      _body: cleanText(n.body || "")
+    }));
+    items.sort((a, b) => b._date - a._date); // پیش‌فرض: جدیدترین
+
+    const html = `
       ${headerSection("اخبار")}
-      <div class="list">${items || "<p class='note'>خبری یافت نشد.</p>"}</div>
+      <section class="card">
+        <div class="panel-head">
+          <div class="info-line">
+            <span class="label">مرتب‌سازی:</span>
+            <div class="btn-group">
+              <button class="btn btn-soft" id="sort-newest">جدیدترین</button>
+              <button class="btn btn-soft" id="sort-oldest">قدیمی‌ترین</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="search-box mt-12">
+          <input id="news-search" type="text" placeholder="جست‌وجو در عنوان و متن خبر">
+          <button class="btn btn-outline" id="news-search-btn">جست‌وجو</button>
+        </div>
+
+        <div id="news-list" class="news-grid mt-12"></div>
+        <div class="pagination mt-12" id="pager"></div>
+      </section>
     `;
+
+    // اتصال رویدادها پس از تزریق
+    requestAnimationFrame(() => {
+      const listEl = document.getElementById("news-list");
+      const pagerEl = document.getElementById("pager");
+      const qEl = document.getElementById("news-search");
+      const qBtn = document.getElementById("news-search-btn");
+      const sortNewest = document.getElementById("sort-newest");
+      const sortOldest = document.getElementById("sort-oldest");
+
+      let filtered = items.slice();
+      let currentPage = 1;
+
+      function renderPage(page = 1) {
+        currentPage = page;
+        const start = (page - 1) * PAGE_SIZE;
+        const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+        listEl.innerHTML = pageItems.map(n => {
+          const summary = n._body.length > 180 ? n._body.slice(0, 180) + "…" : n._body;
+          const imgHtml = n.image_url
+            ? `<div class="card-media">${imageOrNothing(n.image_url, DefaultIcons.news, "news-image")}</div>`
+            : "";
+          const meta = `${formatDate(n.published_at || "")}${n.author ? " • " + cleanText(n.author) : ""}`;
+          return `
+            <article class="card hover-soft">
+              ${imgHtml}
+              <div class="card-content">
+                <h4 class="card-title">
+                  <a href="/news/item/?id=${n.id}" data-link class="link-btn">${n._title}</a>
+                </h4>
+                <p class="card-body">${summary}</p>
+                <div class="card-meta">${meta}</div>
+              </div>
+            </article>
+          `;
+        }).join("") || "<p class='note'>خبری یافت نشد.</p>";
+
+        const pages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+        pagerEl.innerHTML = Array.from({length: pages}, (_, i) => i + 1).map(p => `
+          <a href="#" class="page-link ${p === currentPage ? 'text-strong border-strong' : ''}" data-page="${p}">${p}</a>
+        `).join("");
+
+        pagerEl.querySelectorAll(".page-link").forEach(a => {
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            const p = parseInt(a.getAttribute("data-page"), 10);
+            renderPage(p);
+          });
+        });
+      }
+
+      function applySearch() {
+        const q = cleanText(qEl.value || "");
+        if (!q) { filtered = items.slice(); renderPage(1); return; }
+        const qa = q.toLowerCase();
+        filtered = items.filter(n => (String(n._title).toLowerCase().includes(qa) || String(n._body).toLowerCase().includes(qa)));
+        renderPage(1);
+      }
+
+      qBtn.addEventListener("click", applySearch);
+      qEl.addEventListener("keydown", (e) => { if (e.key === "Enter") applySearch(); });
+      sortNewest.addEventListener("click", () => { items.sort((a,b) => b._date - a._date); applySearch(); });
+      sortOldest.addEventListener("click", () => { items.sort((a,b) => a._date - b._date); applySearch(); });
+
+      renderPage(1);
+    });
+
+    return html;
   }
 
   async function livePage() {
